@@ -3,20 +3,16 @@ use std::io::Write;
 
 use std::mem::transmute;
 
-use crate::debugger;
-use crate::debuggable::*;
 use crate::generateable::*;
 use crate::math::*;
 use crate::utils::*;
 
 use crate::core::*;
 
-use crate::interfaces;
-
 pub trait Executable {
-    fn execute(&mut self);
+    fn execute(&mut self) -> Option<(String, Option<Position>)>;
 
-    fn increment_program_counter(&mut self);
+    fn increment_program_counter(&mut self) -> Option<String>;
 
     fn store_on_data_memory(&mut self, address: u16, value: u8) -> Result<(), String>;
 
@@ -46,14 +42,11 @@ pub trait Executable {
 /// - Se `aux3 == 3` e a entrada for "Hello World", armazena "He\0".
 
 impl Executable for Star {
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Option<(String, Option<Position>)> {
         let instruction_memory_len = match u16::try_from(self.instruction_memory.len()) {
             Ok(len) => len,
             Err(_) => {
-                debugger::exit_with_error(
-                    "Instruction memory length exceeds maximum size of 16 bits",
-                );
-                unreachable!();
+                return Some(("Instruction memory length exceeds maximum size of 16 bits".to_string(), None))
             }
         };
         'execution_loop: while self.registers.program_counter < instruction_memory_len {
@@ -96,7 +89,8 @@ impl Executable for Star {
             */
             if instruction_format == 0b_0000_0000_0000_0000 {
                 // NOP instruction, just increment the program counter
-                self.increment_program_counter();
+                if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
+                
                 continue;
             }
 
@@ -113,7 +107,7 @@ impl Executable for Star {
                                     self.registers.set(reg1, res);
                                     self.registers.carry = if is_carry { 1 } else { 0 };
 
-                                    self.increment_program_counter();
+                                    if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                                 }
                                 Instruction::Sub => {
                                     let reg2_v = self.registers.get(reg2);
@@ -122,7 +116,7 @@ impl Executable for Star {
                                     self.registers.set(reg1, res);
                                     self.registers.carry = if is_carry { 0xFFFF } else { 0 };
 
-                                    self.increment_program_counter();
+                                    if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                                 }
 
                                 Instruction::And | Instruction::Or | Instruction::Xor => {
@@ -136,7 +130,7 @@ impl Executable for Star {
                                     };
                                     self.registers.set(reg1, res);
 
-                                    self.increment_program_counter();
+                                    if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                                 }
 
                                 Instruction::Shl | Instruction::Shr => {
@@ -151,7 +145,7 @@ impl Executable for Star {
                                     self.registers.set(reg1, res);
                                     self.registers.carry = carry;
 
-                                    self.increment_program_counter();
+                                    if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                                 }
 
                                 // ==== Branches ====
@@ -184,16 +178,16 @@ impl Executable for Star {
                                     if condition {
                                         match self.registers.program_counter.checked_add(1) {
                                             Some(ra) => self.registers.return_address = ra,
-                                            None => self.exit_with_optional_positional_error(
-                                                "Return address overflow",
+                                            None => return Some((
+                                                "Return address overflow".to_string(),
                                                 instruction_position_option,
-                                            ),
+                                            )),
                                         }
 
                                         self.registers.program_counter =
                                             self.registers.program_counter.wrapping_add(reg3_v);
                                     } else {
-                                        self.increment_program_counter();
+                                        if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                                     }
                                 }
 
@@ -201,10 +195,10 @@ impl Executable for Star {
                             }
                         }
 
-                        None => self.exit_with_optional_positional_error(
-                            "Invalid instruction format for Trinity",
+                        None => return Some((
+                            "Invalid instruction format for Trinity".to_string(),
                             instruction_position_option,
-                        ),
+                        )),
                     }
                 }
 
@@ -218,7 +212,7 @@ impl Executable for Star {
 
                             self.registers.set(reg, new_value);
 
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
                         Instruction::Lli => {
                             let reg_v = self.registers.get(reg);
@@ -228,14 +222,14 @@ impl Executable for Star {
 
                             self.registers.set(reg, new_value);
 
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
                         _ => unreachable!(),
                     },
-                    None => self.exit_with_optional_positional_error(
-                        "Invalid instruction format for Hime",
+                    None => return Some((
+                        "Invalid instruction format for Hime".to_string(),
                         instruction_position_option,
-                    ),
+                    )),
                 },
 
                 Format::Pair => match defold_pair(instruction_format) {
@@ -249,7 +243,7 @@ impl Executable for Star {
                             self.registers.high = high;
                             self.registers.low = low;
 
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Muluhl => {
@@ -261,7 +255,7 @@ impl Executable for Star {
                             self.registers.high = high;
                             self.registers.low = low;
 
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Divhl => {
@@ -279,7 +273,7 @@ impl Executable for Star {
                                 self.registers.high = i16::cast_unsigned(rem);
                                 self.registers.low = i16::cast_unsigned(res);
                             }
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Divuhl => {
@@ -295,13 +289,13 @@ impl Executable for Star {
                                 self.registers.high = rem;
                                 self.registers.low = res;
                             }
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Not => {
                             let reg2_v = self.registers.get(reg2);
                             self.registers.set(reg1, !reg2_v);
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Xlb => {
@@ -314,7 +308,7 @@ impl Executable for Star {
                             }
                             let res = unsafe { transmute::<(u8, u8), u16>((low, high)) };
                             self.registers.set(reg1, res);
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Lab | Instruction::Llb => {
@@ -336,12 +330,12 @@ impl Executable for Star {
 
                                     self.registers.set(reg1, v);
                                 }
-                                Err(e) => self.exit_with_optional_positional_error(
-                                    e.as_str(),
+                                Err(e) => return Some((
+                                    e,
                                     instruction_position_option,
-                                ),
+                                )),
                             }
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         Instruction::Sab | Instruction::Slb => {
@@ -357,21 +351,21 @@ impl Executable for Star {
 
                             match self.store_on_data_memory(reg2_v, value) {
                                 Ok(_) => {}
-                                Err(e) => self.exit_with_optional_positional_error(
-                                    e.as_str(),
+                                Err(e) => return Some((
+                                    e,
                                     instruction_position_option,
-                                ),
+                                )),
                             }
 
-                            self.increment_program_counter();
+                            if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                         }
 
                         _ => unreachable!(),
                     },
-                    None => self.exit_with_optional_positional_error(
-                        "Invalid instruction format for Pair",
+                    None => return Some((
+                        "Invalid instruction format for Pair".to_string(),
                         instruction_position_option,
-                    ),
+                    )),
                 },
 
                 Format::Clover => match defold_clover(instruction_format) {
@@ -380,19 +374,19 @@ impl Executable for Star {
                             let reg_v = self.registers.get(reg);
                             match self.registers.program_counter.checked_add(1) {
                                 Some(ra) => self.registers.return_address = ra,
-                                None => self.exit_with_optional_positional_error(
-                                    "Return address overflow",
+                                None => return Some((
+                                    "Return address overflow".to_string(),
                                     instruction_position_option,
-                                ),
+                                )),
                             }
                             self.registers.program_counter = reg_v;
                         }
                         _ => unreachable!(),
                     },
-                    None => self.exit_with_optional_positional_error(
-                        "Invalid instruction format for Clover",
+                    None => return Some((
+                        "Invalid instruction format for Clover".to_string(),
                         instruction_position_option,
-                    ),
+                    )),
                 },
 
                 Format::Ark => {
@@ -400,33 +394,46 @@ impl Executable for Star {
                         Some(instruction) => {
                             match instruction {
                                 Instruction::Mcall => {
-                                    if interfaces::default(self) {
+
+                                    let mut interface_option = self.interface.take();
+
+                                    let should_break = if let Some(interface) = interface_option.as_mut() {
+                                        interface.as_mut().mcall(self)
+                                    } else {
+                                        false
+                                    };
+
+                                    self.interface = interface_option;
+
+                                    if should_break {
                                         break 'execution_loop;
                                     }
 
-                                    self.increment_program_counter(); 
+                                    if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));} 
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        None => self.exit_with_optional_positional_error(
-                            "Invalid instruction format for Ark",
+                        None => return Some((
+                            "Invalid instruction format for Ark".to_string(),
                             instruction_position_option,
-                        ),
+                        )),
                     }
                 }
             }
         }
         io::stdout().flush().unwrap();
+        return None;
     }
 
-    fn increment_program_counter(&mut self) {
+    fn increment_program_counter(&mut self) -> Option<String>{
         match self.registers.program_counter.checked_add(1) {
             Some(new_pc) => {
                 self.registers.program_counter = new_pc;
+                return None;
             }
             None => {
-                debugger::exit_with_error("Program counter overflow");
+                return Some("Program counter overflow".to_string());
             }
         }
     }

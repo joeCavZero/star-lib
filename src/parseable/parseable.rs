@@ -1,4 +1,3 @@
-use crate::debuggable::Debugable;
 use crate::utils::*;
 use crate::core::*;
 use super::ast::*;
@@ -6,12 +5,12 @@ use super::reader::*;
 use super::sequence::*;
 
 pub trait Parseable {
-    fn parse(&self, ptokens: &Vec<PositionedToken>) -> Ast;
+    fn parse(&self, ptokens: &Vec<PositionedToken>) -> Result<Ast, (String, Position)>;
     fn read_comma_separated_numbers(&self, ptokens: &Vec<PositionedToken>, start_index: usize) -> Vec<PositionedToken>;
 }
 
 impl Parseable for Star {
-    fn parse(&self, ptokens: &Vec<PositionedToken>) -> Ast {
+    fn parse(&self, ptokens: &Vec<PositionedToken>) -> Result<Ast, (String, Position)> {
         let mut ast = Ast {
             data_field: Vec::new(),
             instr_field: Vec::new(),
@@ -26,6 +25,7 @@ impl Parseable for Star {
                 Some(ptk) => ptk,
                 None => unreachable!(),
             };
+
             match ptk.token {
                 // ==== Detect the current field ====
                 Token::Directive(Directive::Data) => {
@@ -38,6 +38,7 @@ impl Parseable for Star {
                     ptk_counter += 1;
                     continue;
                 }
+
                 // ==== Case not is a Data or Instr Directive ====
                 _ => {
                     match field {
@@ -49,16 +50,20 @@ impl Parseable for Star {
                                     ptk_counter += 1;
                                     continue;
                                 }
+
                                 Token::Directive(Directive::Byte)
                                 | Token::Directive(Directive::Word) => {
-                                    let data: Vec<PositionedToken> = self.read_comma_separated_numbers(ptokens, ptk_counter + 1);
+                                    let data: Vec<PositionedToken> =
+                                        self.read_comma_separated_numbers(ptokens, ptk_counter + 1);
+
                                     let data_len = data.len();
-                                    if data_len <= 0 {
-                                        self.exit_with_positional_error(
-                                            "Directive expects at least one number",
-                                            ptk.position,
-                                        )
+                                    if data_len == 0 {
+                                        return Err((
+                                            "Directive expects at least one number".to_string(),
+                                            ptk.position.clone(),
+                                        ));
                                     }
+
                                     ast.data_field.push(
                                         DataCamp {
                                             label_declarations: label_declaration_accumulator.clone(),
@@ -66,10 +71,12 @@ impl Parseable for Star {
                                             arg: DataCampArg::Multiple(data.clone()),
                                         }
                                     );
+
                                     ptk_counter += data_len * 2;
                                     label_declaration_accumulator.clear();
                                     continue;
                                 }
+
                                 Token::Directive(Directive::Space) => {
                                     match ptokens.get(ptk_counter + 1) {
                                         Some(next_ptk) => {
@@ -85,18 +92,21 @@ impl Parseable for Star {
                                                 label_declaration_accumulator.clear();
                                                 continue;
                                             } else {
-                                                self.exit_with_positional_error(
-                                                    "Directive expects a number",
-                                                    ptk.position,
-                                                );
+                                                return Err((
+                                                    "Directive expects a number".to_string(),
+                                                    ptk.position.clone(),
+                                                ));
                                             }
                                         }
-                                        None => self.exit_with_positional_error(
-                                            "Directive expects a number",
-                                            ptk.position,
-                                        ),
+                                        None => {
+                                            return Err((
+                                                "Directive expects a number".to_string(),
+                                                ptk.position.clone(),
+                                            ));
+                                        }
                                     };
                                 }
+
                                 Token::Directive(Directive::String)
                                 | Token::Directive(Directive::Stringz) => {
                                     match ptokens.get(ptk_counter + 1) {
@@ -113,18 +123,21 @@ impl Parseable for Star {
                                                 label_declaration_accumulator.clear();
                                                 continue;
                                             } else {
-                                                self.exit_with_positional_error(
-                                                    "Directive expects a literal string",
-                                                    ptk.position,
-                                                );
+                                                return Err((
+                                                    "Directive expects a literal string".to_string(),
+                                                    ptk.position.clone(),
+                                                ));
                                             }
                                         }
-                                        None => self.exit_with_positional_error(
-                                            "Directive expects a literal string",
-                                            ptk.position,
-                                        ),
+                                        None => {
+                                            return Err((
+                                                "Directive expects a literal string".to_string(),
+                                                ptk.position.clone(),
+                                            ));
+                                        }
                                     };
                                 }
+
                                 Token::Directive(Directive::Checkpoint) => {
                                     ast.data_field.push(
                                         DataCamp {
@@ -137,10 +150,13 @@ impl Parseable for Star {
                                     label_declaration_accumulator.clear();
                                     continue;
                                 }
-                                _ => self.exit_with_positional_error(
-                                    "Invalid expression in data field",
-                                    ptk.position,
-                                ),
+
+                                _ => {
+                                    return Err((
+                                        "Invalid expression in data field".to_string(),
+                                        ptk.position.clone(),
+                                    ));
+                                }
                             }
                         }
 
@@ -153,12 +169,11 @@ impl Parseable for Star {
                                     ptk_counter += 1;
                                     continue;
                                 }
+
                                 Token::Instruction(instr) => {
-                                    // ==== READ NONE ====
                                     match instr {
-                                        Instruction::Mcall
-                                        => {
-                                            // e.g.: ret
+                                        // ==== READ NONE ====
+                                        Instruction::Mcall => {
                                             ast.instr_field.push(
                                                 InstrCamp {
                                                     label_declarations: label_declaration_accumulator.clone(),
@@ -173,7 +188,6 @@ impl Parseable for Star {
 
                                         // ==== READ REG ====
                                         Instruction::J => {
-                                            // e.g.: j $r
                                             match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -187,32 +201,14 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
-                                            }
-                                        }
-                                        /* DELETED:
-                                            Instruction::Br => {
-                                                // e.g.: br $r
-                                                match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
-                                                    Ok(sequence) => {
-                                                        ast.instr_field.push(
-                                                            InstrCamp {
-                                                                label_declarations: label_declaration_accumulator.clone(),
-                                                                instruction: ptk.clone(),
-                                                                sequence,
-                                                            }
-                                                        );
-                                                        ptk_counter += 2;
-                                                        label_declaration_accumulator.clear();
-                                                        continue;
-                                                    }
-                                                    Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
                                                 }
                                             }
-                                        */
+                                        }
+
                                         // ==== READ REG REG ====
                                         Instruction::Xlb
-
                                         | Instruction::Lab
                                         | Instruction::Llb
                                         | Instruction::Sab
@@ -221,9 +217,7 @@ impl Parseable for Star {
                                         | Instruction::Divhl
                                         | Instruction::Muluhl
                                         | Instruction::Divuhl
-                                        | Instruction::Not
-                                        => {
-                                            // e.g.: xlb $r1, $r2
+                                        | Instruction::Not => {
                                             match read_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -237,15 +231,15 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
 
                                         // ==== READ REG IMM ====
                                         Instruction::Lai
-                                        | Instruction::Lli
-                                        => {
-                                            // e.g.: lai $r, $imm<8>
+                                        | Instruction::Lli => {
                                             match read_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -259,8 +253,10 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
-                                            } 
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
+                                            }
                                         }
 
                                         // ==== READ REG REG REG ====
@@ -276,9 +272,7 @@ impl Parseable for Star {
                                         | Instruction::Bgtr
                                         | Instruction::Bltr
                                         | Instruction::Bgtur
-                                        | Instruction::Bltur
-                                        => {
-                                            // e.g.: add $r, $r, $r
+                                        | Instruction::Bltur => {
                                             match read_r_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(three_seq) => {
                                                     ast.instr_field.push(
@@ -292,17 +286,18 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
                                     }
                                 }
+
                                 Token::PseudoInstruction(pseudo_instr) => {
                                     match pseudo_instr {
                                         PseudoInstruction::Nope
-                                        | PseudoInstruction::Ret
-                                        => {
-                                            // e.g.: nope
+                                        | PseudoInstruction::Ret => {
                                             ast.instr_field.push(
                                                 InstrCamp {
                                                     label_declarations: label_declaration_accumulator.clone(),
@@ -314,13 +309,10 @@ impl Parseable for Star {
                                             label_declaration_accumulator.clear();
                                             continue;
                                         }
-                                        
+
                                         PseudoInstruction::Inc
                                         | PseudoInstruction::Dec
-
-                                        | PseudoInstruction::Jr
-                                        => {
-                                            // e.g.: jr $r
+                                        | PseudoInstruction::Jr => {
                                             match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -334,12 +326,14 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
+
                                         // ==== READ IDENTIFIER ====
                                         PseudoInstruction::Ja => {
-                                            // e.g.: ba address
                                             match read_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -353,13 +347,15 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
+
                                         // ==== READ REG REG ====
                                         PseudoInstruction::Move
-                                        | PseudoInstruction::Swap
-                                        => {
+                                        | PseudoInstruction::Swap => {
                                             match read_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -373,13 +369,13 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
-                                        
-                                        PseudoInstruction::Li
-                                        => {
-                                            // e.g.: li $r, $imm
+
+                                        PseudoInstruction::Li => {
                                             match read_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -393,14 +389,14 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
 
                                         // ==== READ REG IDENTIFIER ====
-                                        PseudoInstruction::La
-                                        => {
-                                            // e.g.: la $r, address
+                                        PseudoInstruction::La => {
                                             match read_r_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -414,16 +410,16 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
 
                                         // ==== READ REG REG REG ====
                                         PseudoInstruction::Mul
                                         | PseudoInstruction::Div
-                                        | PseudoInstruction::Mod
-                                        => {
-                                            // e.g.: mul $rd, $rs, $rt
+                                        | PseudoInstruction::Mod => {
                                             match read_r_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(three_seq) => {
                                                     ast.instr_field.push(
@@ -437,7 +433,9 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
 
@@ -451,9 +449,7 @@ impl Parseable for Star {
                                         | PseudoInstruction::Shri
                                         | PseudoInstruction::Muli
                                         | PseudoInstruction::Divi
-                                        | PseudoInstruction::Modi
-                                        => {
-                                            // e.g.: addi $rd, $rs, imm
+                                        | PseudoInstruction::Modi => {
                                             match read_r_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -467,7 +463,9 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
 
@@ -475,9 +473,7 @@ impl Parseable for Star {
                                         PseudoInstruction::Lb
                                         | PseudoInstruction::Lw
                                         | PseudoInstruction::Sb
-                                        | PseudoInstruction::Sw
-                                        => {
-                                            // e.g.: lb $rd, $rs[imm]
+                                        | PseudoInstruction::Sw => {
                                             match read_r_r_br_n_br(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -491,7 +487,9 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
 
@@ -501,9 +499,7 @@ impl Parseable for Star {
                                         | PseudoInstruction::Bgta
                                         | PseudoInstruction::Blta
                                         | PseudoInstruction::Bgtua
-                                        | PseudoInstruction::Bltua
-                                        => {
-                                            // e.g.: beqa $rs, $rt, address
+                                        | PseudoInstruction::Bltua => {
                                             match read_r_r_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -517,26 +513,30 @@ impl Parseable for Star {
                                                     label_declaration_accumulator.clear();
                                                     continue;
                                                 }
-                                                Err((err_msg, err_pos)) => self.exit_with_positional_error(&err_msg, err_pos),
+                                                Err((err_msg, err_pos)) => {
+                                                    return Err((err_msg, err_pos));
+                                                }
                                             }
                                         }
                                     }
                                 }
+
                                 _ => {
-                                    self.exit_with_positional_error(
-                                        "Invalid expression in instruction field",
-                                        ptk.position,
-                                    );
+                                    return Err((
+                                        "Invalid expression in instruction field".to_string(),
+                                        ptk.position.clone(),
+                                    ));
                                 }
                             }
                         }
-                        _ => unreachable!()
+
+                        _ => unreachable!(),
                     }
                 }
             }
         }
 
-        ast
+        Ok(ast)
     }
 
     fn read_comma_separated_numbers(&self, ptokens: &Vec<PositionedToken>, start_index: usize) -> Vec<PositionedToken> {
@@ -563,5 +563,3 @@ impl Parseable for Star {
         numbers
     }
 }
-
-

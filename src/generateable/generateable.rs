@@ -2,7 +2,6 @@
 use std::mem::transmute;
 
 use crate::core::*;
-use crate::debuggable::Debugable;
 use crate::generateable::*;
 use crate::math::split_u16_to_strings;
 use crate::math::u16_from_string;
@@ -11,19 +10,24 @@ use crate::parseable::*;
 use crate::utils::*;
 
 pub trait Generateable {
-    fn generate(&mut self, ast: &Ast) -> usize;
-    fn generate_data_memory(&mut self, ast: &Ast) -> usize;
-    fn generate_instruction_memory(&mut self, ast: &Ast);
+    fn generate(&mut self, ast: &Ast) -> Result<usize, (String, Position)>;
+    fn generate_data_memory(&mut self, ast: &Ast) -> Result<usize, (String, Position)>;
+    fn generate_instruction_memory(&mut self, ast: &Ast) -> Option<(String, Position)>;
 }
 
 impl Generateable for Star {
-    fn generate(&mut self, ast: &Ast) -> usize {
-        let data_section_size = self.generate_data_memory(ast);
-        self.generate_instruction_memory(ast);
-        return data_section_size;
+    fn generate(&mut self, ast: &Ast) -> Result<usize, (String, Position)> {
+        match self.generate_data_memory(ast) {
+            Ok(data_section_size) => {
+                self.generate_instruction_memory(ast);
+                return Ok(data_section_size);
+            }
+            Err(e) => return Err(e),
+        }
+        
     }
 
-    fn generate_data_memory(&mut self, ast: &Ast) -> usize {
+    fn generate_data_memory(&mut self, ast: &Ast) -> Result<usize, (String, Position)> {
         let mut is_data_section_empty = true;
         let mut data_memory_pointer: usize = 0;
         for data_camp in ast.data_field.iter() {
@@ -46,18 +50,18 @@ impl Generateable for Star {
                                                         data_memory_pointer += 1;
                                                     }
                                                     None => {
-                                                        self.exit_with_positional_error(
-                                                            "Data memory overflow",
+                                                        return Err((
+                                                            "Data memory overflow".to_string(),
                                                             val_ptk.position,
-                                                        );
+                                                        ));
                                                     }
                                                 }
                                             }
                                             Err(e) => {
-                                                self.exit_with_positional_error(
-                                                    e.as_str(),
+                                                return Err((
+                                                    e.to_string(),
                                                     val_ptk.position,
-                                                );
+                                                ));
                                             }
                                         }
                                     }
@@ -69,10 +73,10 @@ impl Generateable for Star {
                                                 if let Some(byte1) = self.data_memory.get_mut(data_memory_pointer) {
                                                     *byte1 = u8_from_string(high).unwrap_or(0);
                                                 } else {
-                                                    self.exit_with_positional_error(
-                                                        "Data memory overflow",
+                                                    return Err((
+                                                        "Data memory overflow".to_string(),
                                                         val_ptk.position,
-                                                    );
+                                                    ));
                                                 }
 
                                                 data_memory_pointer += 1;
@@ -80,19 +84,19 @@ impl Generateable for Star {
                                                 if let Some(byte2) = self.data_memory.get_mut(data_memory_pointer) {
                                                     *byte2 = u8_from_string(low).unwrap_or(0);
                                                 } else {
-                                                    self.exit_with_positional_error(
-                                                        "Data memory overflow",
+                                                    return Err((
+                                                        "Data memory overflow".to_string(),
                                                         val_ptk.position,
-                                                    );
+                                                    ));
                                                 }
 
                                                 data_memory_pointer += 1;
                                             }
                                             Err(e) => {
-                                                self.exit_with_positional_error(
-                                                    e.as_str(),
+                                                return Err((
+                                                    e,
                                                     val_ptk.position,
-                                                );
+                                                ));
                                             }
                                         }
                                     }
@@ -112,10 +116,10 @@ impl Generateable for Star {
                                     data_memory_pointer += num as usize;
                                 }
                                 Err(e) => {
-                                    self.exit_with_positional_error(
-                                        e.as_str(),
+                                    return Err((
+                                        e,
                                         value.position,
-                                    );
+                                    ));
                                 }
                             }
                         } else {
@@ -135,10 +139,10 @@ impl Generateable for Star {
                                     *data_byte = byte;
                                     data_memory_pointer += 1;
                                 } else {
-                                    self.exit_with_positional_error(
-                                        "Data memory overflow",
+                                    return Err((
+                                        "Data memory overflow".to_string(),
                                         value.position,
-                                    );
+                                    ));
                                 }
                             }
 
@@ -148,10 +152,10 @@ impl Generateable for Star {
                                     *data_byte = 0; // Null terminator
                                     data_memory_pointer += 1;
                                 } else {
-                                    self.exit_with_positional_error(
-                                        "Data memory overflow",
+                                    return Err((
+                                        "Data memory overflow".to_string(),
                                         value.position,
-                                    );
+                                    ));
                                 }
                             }
                         } else {
@@ -165,10 +169,10 @@ impl Generateable for Star {
                     if let DataCampArg::Empty = data_camp.arg {
                         // Nothing to do here, just a checkpoint
                     } else {
-                        self.exit_with_positional_error(
-                            "Checkpoint directive does not accept arguments",
+                        return Err((
+                            "Checkpoint directive does not accept arguments".to_string(),
                             data_camp.directive.position,
-                        );
+                        ));
                     }
                 }
                 _ => unreachable!(),
@@ -176,13 +180,12 @@ impl Generateable for Star {
         }
     
         if is_data_section_empty {
-            return 0;
+            return Ok(0);
         } else {
-            return data_memory_pointer;
+            return Ok(data_memory_pointer);
         }
     }
-
-    fn generate_instruction_memory(&mut self, ast: &Ast) {
+    fn generate_instruction_memory(&mut self, ast: &Ast) -> Option<(String, Position)> {
         for instr_camp in ast.instr_field.iter() {
             if let Token::Instruction(instruction) = instr_camp.instruction.token.clone() {
                 match instruction.format() {
@@ -226,10 +229,10 @@ impl Generateable for Star {
                                         self.instruction_memory.push(instr_low);
                                     }
                                     Err(e) => {
-                                        self.exit_with_positional_error(
-                                            e.as_str(),
+                                        return Some((
+                                            e,
                                             imm_ptk.position,
-                                        );
+                                        ));
                                     }
                                 }
                             } else {
@@ -296,5 +299,6 @@ impl Generateable for Star {
                 }
             }
         }
+        return None;
     }
 }
