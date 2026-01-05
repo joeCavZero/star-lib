@@ -1,4 +1,4 @@
-use crate::star::utils::*;
+use crate::utils::*;
 
 pub fn fold_trinity(instruction: Instruction, reg1: GeneralRegister, reg2: GeneralRegister, reg3: GeneralRegister) -> u16 {
     let mut format = 0b0000_0000_0000_0000;

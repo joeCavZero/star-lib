@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use crate::star::utils::*;
-use crate::star::core::*;
-use crate::star::generateable::*;
-use crate::star::resolveable::*;
-use crate::star::scannable::*;
-use crate::star::parseable::*;
+use crate::utils::*;
+use crate::core::*;
+use crate::generateable::*;
+use crate::resolveable::*;
+use crate::scannable::*;
+use crate::parseable::*;
 
 pub const DATA_MEMORY_SIZE: usize = 65536;
 

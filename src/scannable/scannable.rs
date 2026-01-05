@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::debugger;
-use crate::star::core::*;
-use crate::star::utils::*;
-use crate::star::debuggable::*;
-use crate::star::scannable::positioned_tokens_vectorable::*;
+use crate::core::*;
+use crate::utils::*;
+use crate::debuggable::*;
+use crate::scannable::positioned_tokens_vectorable::*;
 
 type MacroTable = HashMap<String, (Vec<PositionedToken>, Vec<PositionedToken>)>;
 

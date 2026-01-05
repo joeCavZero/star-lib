@@ -1,4 +1,4 @@
-use crate::star::utils::Format;
+use crate::utils::Format;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Instruction {

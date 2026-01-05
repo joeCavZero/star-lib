@@ -1,6 +1,6 @@
-use crate::star::debuggable::Debugable;
-use crate::star::utils::*;
-use crate::star::core::*;
+use crate::debuggable::Debugable;
+use crate::utils::*;
+use crate::core::*;
 use super::ast::*;
 use super::reader::*;
 use super::sequence::*;

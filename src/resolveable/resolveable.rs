@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::star::core::*;
-use crate::star::debuggable::*;
-use crate::star::math::*;
-use crate::star::parseable::*;
-use crate::star::symbolable::*;
-use crate::star::utils::*;
+use crate::core::*;
+use crate::debuggable::*;
+use crate::math::*;
+use crate::parseable::*;
+use crate::symbolable::*;
+use crate::utils::*;
 
 pub type SymbolTable = HashMap<String, u16>;
 

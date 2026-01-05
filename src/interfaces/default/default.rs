@@ -1,10 +1,10 @@
 use std::mem::transmute;
 use std::io::{self, Write};
 
-use crate::star::Star;
-use crate::star::math::*;
-use crate::star::executable::Executable;
-use crate::star::debuggable::Debugable;
+use crate::Star;
+use crate::math::*;
+use crate::executable::Executable;
+use crate::debuggable::Debugable;
 
 pub fn default(star: &mut Star) -> bool {
     let instruction_position_option = star

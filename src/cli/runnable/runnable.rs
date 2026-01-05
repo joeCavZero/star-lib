@@ -3,10 +3,10 @@ use std::io::Write;
 
 use crate::cli::*;
 use crate::debugger;
-use crate::star::binaryable::Binaryable;
-use crate::star::executable::Executable;
-use crate::star::resolveable::SymbolTable;
-use crate::star::Star;
+use crate::binaryable::Binaryable;
+use crate::executable::Executable;
+use crate::resolveable::SymbolTable;
+use crate::Star;
 
 pub trait Runnable {
     fn run(&mut self);

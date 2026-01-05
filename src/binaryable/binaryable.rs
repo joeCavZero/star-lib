@@ -1,4 +1,8 @@
-use crate::{debugger, star::{debuggable::Debugable, math::u8_from_string, utils::Position, Star}};
+use crate::debugger;
+use crate::Star;
+use crate::utils::Position;
+use crate::debuggable::Debugable;
+use crate::math::u8_from_string;
 
 /*
     The main idea of binaryable is to provide a way to process binary files

@@ -1,14 +1,14 @@
 
 use std::mem::transmute;
 
-use crate::star::core::*;
-use crate::star::debuggable::Debugable;
-use crate::star::generateable::*;
-use crate::star::math::split_u16_to_strings;
-use crate::star::math::u16_from_string;
-use crate::star::math::u8_from_string;
-use crate::star::parseable::*;
-use crate::star::utils::*;
+use crate::core::*;
+use crate::debuggable::Debugable;
+use crate::generateable::*;
+use crate::math::split_u16_to_strings;
+use crate::math::u16_from_string;
+use crate::math::u8_from_string;
+use crate::parseable::*;
+use crate::utils::*;
 
 pub trait Generateable {
     fn generate(&mut self, ast: &Ast) -> usize;

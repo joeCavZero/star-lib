@@ -1,4 +1,4 @@
-use crate::star::utils::*;
+use crate::utils::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PositionedToken {

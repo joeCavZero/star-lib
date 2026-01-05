@@ -1,6 +1,6 @@
 use std::mem::transmute;
 
-use crate::star::utils::*;
+use crate::utils::*;
 
 pub fn defold_trinity(fmt: u16) -> Option<(Instruction, GeneralRegister, GeneralRegister, GeneralRegister)> {
     match Instruction::from_opcode(fmt & 0b_0000_0000_0000_1111) {

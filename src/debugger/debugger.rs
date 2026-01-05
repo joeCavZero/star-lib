@@ -1,7 +1,7 @@
 use colored::Colorize;
 use supports_color::Stream;
 
-use crate::star::utils::Stringable;
+use crate::utils::Stringable;
 
 const INTERPRETER_NAME: &str = "STAR";
 

@@ -1,4 +1,4 @@
-use crate::star::{core::DATA_MEMORY_SIZE, utils::GeneralRegister};
+use crate::{core::DATA_MEMORY_SIZE, utils::GeneralRegister};
 
 #[derive(Debug, Clone)]
 pub struct Registers {

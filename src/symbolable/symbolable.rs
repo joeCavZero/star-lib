@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::star::core::*;
-use crate::star::debuggable::*;
-use crate::star::math::*;
-use crate::star::parseable::*;
-use crate::star::resolveable::*;
-use crate::star::utils::*;
+use crate::core::*;
+use crate::debuggable::*;
+use crate::math::*;
+use crate::parseable::*;
+use crate::resolveable::*;
+use crate::utils::*;
 
 pub trait Symbolable {
     fn get_symbol_table(&self, ast: &mut Ast) -> SymbolTable;

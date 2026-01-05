@@ -1,4 +1,4 @@
-use crate::star::{parseable::Sequence, utils::*};
+use crate::{parseable::Sequence, utils::*};
 
 pub fn read_r_r_sequence(ptokens: &Vec<PositionedToken>, start_index: usize, base_position: Position) -> Result<Sequence, (String, Position)> {
     match ptokens.get(start_index) {

@@ -4,12 +4,12 @@ use std::io::Write;
 use std::mem::transmute;
 
 use crate::debugger;
-use crate::star::debuggable::*;
-use crate::star::generateable::*;
-use crate::star::math::*;
-use crate::star::utils::*;
+use crate::debuggable::*;
+use crate::generateable::*;
+use crate::math::*;
+use crate::utils::*;
 
-use crate::star::core::*;
+use crate::core::*;
 
 use crate::interfaces;
 

@@ -1,5 +1,5 @@
-use crate::star::core::*;
-use crate::star::utils::*;
+use crate::core::*;
+use crate::utils::*;
 
 use crate::debugger;
 
