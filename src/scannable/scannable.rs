@@ -11,7 +11,7 @@ pub trait Scannable {
     fn scan_file(&mut self, base_file_path: &str)
         -> Result<Vec<PositionedToken>, (String, Option<Position>)>;
 
-    fn scan(&mut self, source: String)
+    fn scan(&mut self, source: &String)
         -> Result<Vec<PositionedToken>, (String, Option<Position>)>;
 
     fn scan_and_resolve_processors(
@@ -65,7 +65,7 @@ impl Scannable for Star {
         )
     }
 
-    fn scan(&mut self, source: String)
+    fn scan(&mut self, source: &String)
         -> Result<Vec<PositionedToken>, (String, Option<Position>)>
     {
         let mut file_dependency_table: HashMap<usize, HashSet<usize>> = HashMap::new();

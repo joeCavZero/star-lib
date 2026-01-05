@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use crate::math::u8_from_string;
@@ -37,24 +38,11 @@ impl Star {
         }
     }
 
-    pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(SymbolTable, usize), (String, Option<Position>)> {        
-        
-        match self.scan_file(file_path) {
+    pub fn load_from_assembly(&mut self, source: &String) -> Result<(SymbolTable, usize), (String, Option<Position>)> {
+        match self.scan(source) {
             Ok(ptokens) => {
-                match self.parse(&ptokens) {
-                    Ok(mut ast) => {
-                        match self.resolve(&mut ast) {
-                            Ok(symbol_table) => {
-                                match self.generate(&ast) {
-                                    Ok(data_section_size) => {
-                                        return Ok((symbol_table, data_section_size));
-                                    }
-                                    Err((e_string, e_position)) => return Err((e_string, Some(e_position))),
-                                }
-                            }
-                            Err((e_string, e_position)) => return Err((e_string, Some(e_position))),
-                        }
-                    }
+                match self.process_positioned_tokens_from_assembly(ptokens) {
+                    Ok(okay) => Ok(okay),
                     Err((e_string, e_position)) => return Err((e_string, Some(e_position))),
                 }
             }
@@ -62,44 +50,68 @@ impl Star {
         }
     }
 
-    pub fn load_from_binary(&mut self, file_path: &String) -> Option<(String, Option<Position>)> {
-        use std::fs;
-
-        let absolute_file_path: String = match fs::canonicalize(file_path) {
-            Ok(path) => path.to_str().unwrap_or(file_path).to_string(),
-            Err(_) => {
-                return Some((
-                    format!("Failed to read binary file '{}'", file_path),
-                    None,
-                ));
+    pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(SymbolTable, usize), (String, Option<Position>)> {        
+        
+        match self.scan_file(file_path) {
+            Ok(ptokens) => {
+                match self.process_positioned_tokens_from_assembly(ptokens) {
+                    Ok(okay) => Ok(okay),
+                    Err((e_string, e_position)) => return Err((e_string, Some(e_position))),
+                }
             }
-        };
+            Err(e) => return Err(e),
+        }
+    }
 
-        self.file_table
-            .insert(self.file_table.len(), absolute_file_path.clone());
-
-        let id_option = match self.get_file_id_by_path(&absolute_file_path) {
-            Some(id) => Some(id),
-            None => {
-                return Some((
-                    format!("File '{}' not found in file table", absolute_file_path),
-                    None,
-                ))
+    fn process_positioned_tokens_from_assembly(&mut self, ptokens: Vec<PositionedToken>) ->Result<(SymbolTable, usize), (String, Position)> {
+        match self.parse(&ptokens) {
+            Ok(mut ast) => {
+                match self.resolve(&mut ast) {
+                    Ok(symbol_table) => {
+                        match self.generate(&ast) {
+                            Ok(data_section_size) => {
+                                return Ok((symbol_table, data_section_size));
+                            }
+                            Err((e_string, e_position)) => return Err((e_string, e_position)),
+                        }
+                    }
+                    Err((e_string, e_position)) => return Err((e_string, e_position)),
+                }
             }
+            Err((e_string, e_position)) => return Err((e_string, e_position)),
+        }
+    }
+
+
+    pub fn load_from_binary_file(&mut self, file_path: &str) -> Result<usize, (String, Option<Position>)> {
+        let file_path_string = file_path.to_string();
+        let absolute_file_path: String = match fs::canonicalize(file_path_string.clone()) {
+            Ok(path) => path.to_string_lossy().to_string(),
+            Err(_) => 
+                return Err((
+                    format!("Failed to read binary file '{}'", file_path_string),
+                    None,
+                )),
         };
 
         let file_content = match fs::read_to_string(&absolute_file_path) {
             Ok(content) => content.replace("\r", ""),
             Err(_) => {
-                return Some((
+                return Err((
                     format!("Failed to read binary file '{}'", absolute_file_path),
                     None,
                 ))
             }
         };
 
-        let mut section = ".instr".to_string();
+        return self.load_from_binary(&file_content);
+    }
 
+    pub fn load_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<Position>)> {
+        
+        let id_option: Option<usize> = None;
+        
+        let mut section = ".instr".to_string();
         let mut actual_line: usize = 1;
         let mut actual_column: usize = 1;
 
@@ -111,7 +123,7 @@ impl Star {
         let mut line_has_identation = false;
 
         let mut accumulator = String::new();
-        let mut chars = file_content.chars().peekable();
+        let mut chars = source.chars().peekable();
 
         while let Some(ch) = chars.next() {
             match ch {
@@ -145,7 +157,7 @@ impl Star {
                                         self.instruction_memory.push(v);
                                     }
                                     Err(_) => {
-                                        return Some((
+                                        return Err((
                                             "Invalid binary instruction".to_string(),
                                             Some(Position::new(
                                                 id_option,
@@ -178,7 +190,7 @@ impl Star {
                                         data_memory_vector.push(v);
                                     }
                                     Err(_) => {
-                                        return Some((
+                                        return Err((
                                             "Invalid binary data".to_string(),
                                             Some(Position::new(
                                                 id_option,
@@ -191,7 +203,7 @@ impl Star {
                             }
 
                             _ => {
-                                return Some((
+                                return Err((
                                     "Unknown section".to_string(),
                                     Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                                 ));
@@ -225,7 +237,7 @@ impl Star {
                     let v = match u8_from_string(aux) {
                         Ok(v) => v,
                         Err(_) => {
-                            return Some((
+                            return Err((
                                 "Invalid binary instruction".to_string(),
                                 Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                             ))
@@ -254,7 +266,7 @@ impl Star {
                     let v = match u8_from_string(aux) {
                         Ok(v) => v,
                         Err(_) => {
-                            return Some((
+                            return Err((
                                 "Invalid binary data".to_string(),
                                 Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                             ))
@@ -265,7 +277,7 @@ impl Star {
                 }
 
                 _ => {
-                    return Some((
+                    return Err((
                         "Unknown section".to_string(),
                         Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                     ));
@@ -276,11 +288,11 @@ impl Star {
         for (i, b) in data_memory_vector.iter().enumerate() {
             match self.data_memory.get_mut(i) {
                 Some(memory_byte) => *memory_byte = *b,
-                None => return Some(("Data memory out of bounds".to_string(), None)),
+                None => return Err(("Data memory out of bounds".to_string(), None)),
             }
         }
 
-        None
+        Ok(data_memory_vector.len())
     }
 
     pub fn save_binary(&self, file_path: &str, data_section_size: usize) -> Option<String> {
