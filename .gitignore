@@ -1,0 +1,6 @@
+/.vscode
+/target
+/notes
+
+/*.asm
+/*.txt
