@@ -1,12 +1,12 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
-    pub file: u32,
-    pub line: u32,
-    pub column: Option<u32>,
+    pub file: Option<usize>,
+    pub line: usize,
+    pub column: Option<usize>,
 }
 
 impl Position {
-    pub fn new(file: u32, line: u32, column: Option<u32>) -> Self {
+    pub fn new(file: Option<usize>, line: usize, column: Option<usize>) -> Self {
         Self {
             file,
             line,

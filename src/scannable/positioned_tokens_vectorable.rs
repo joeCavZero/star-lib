@@ -4,9 +4,9 @@ pub trait PositionedTokensVectorable {
     fn push_positioned_token(
         &mut self,
         token_string: String,
-        file_id: u32,
-        line: u32,
-        column: Option<u32>,
+        file_id: Option<usize>,
+        line: usize,
+        column: Option<usize>,
     ) -> Result<(), String>;
 
     fn scan_macro_definition_head(
@@ -18,7 +18,7 @@ pub trait PositionedTokensVectorable {
     fn scan_macro_sequence(
         &self,
         start_index: usize,
-        identifier_line: u32,
+        identifier_line: usize,
     ) -> Result<(Vec<PositionedToken>, usize), (String, Position)>;
 
     fn scan_macro_calling_head(
@@ -32,9 +32,9 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
     fn push_positioned_token(
         &mut self,
         token_string: String,
-        file_id: u32,
-        line: u32,
-        column: Option<u32>,
+        file_id: Option<usize>,
+        line: usize,
+        column: Option<usize>,
     ) -> Result<(), String> {
         let tkn = Token::from_string(token_string);
         match tkn {
@@ -53,13 +53,13 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
     fn scan_macro_sequence(
         &self,
         start_index: usize,
-        identifier_line: u32,
+        identifier_line: usize,
     ) -> Result<(Vec<PositionedToken>, usize), (String, Position)> {
         // This function reads a sequence of tokens that defines a define processor
         // Backslash ables to continue reading the sequence in the next line
         let mut sequence: Vec<PositionedToken> = Vec::new();
         let mut ptokens_read: usize = 0;
-        let mut line_to_read: u32 = identifier_line;
+        let mut line_to_read: usize = identifier_line;
         let mut index = start_index;
 
         while index < self.len() {

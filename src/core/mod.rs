@@ -1,7 +1,7 @@
-pub mod star;
+pub mod core;
 pub mod registers;
 pub mod interface;
 
-pub use star::*;
+pub use core::*;
 pub use registers::*;
 pub use interface::*;

@@ -49,34 +49,36 @@ impl Executable for Star {
                 return Some(("Instruction memory length exceeds maximum size of 16 bits".to_string(), None))
             }
         };
-        'execution_loop: while self.registers.program_counter < instruction_memory_len {
-            //let (instruction_format, instruction_position) = match self.instruction_memory.get(self.registers.program_counter as usize) {
-            //    Some(instr) => (instr.format, instr.position),
-            //    None => {
-            //        self.exit_with_error("Program counter out of bounds");
-            //        break;
-            //    }
-            //};
 
-            let instr_index: usize = (self.registers.program_counter as usize) * 2;
+        'execution_loop: while self.registers.program_counter < instruction_memory_len {
+            let (instr_high, instr_low) = match self.registers.program_counter.checked_mul(2) {
+                Some(high_pos) => {
+                    match high_pos.checked_add(1) {
+                        Some(low_pos) => {
+                            (
+                                match self.instruction_memory.get(high_pos as usize) {
+                                    Some(byte) => *byte,
+                                    None => break 'execution_loop,
+                                },
+                                match self.instruction_memory.get(low_pos as usize) {
+                                    Some(byte) => *byte,
+                                    None => break 'execution_loop,
+                                },
+                            )
+                        }
+                        None => break 'execution_loop,
+                    }
+                }
+                None => break 'execution_loop,
+            };
+
+            self.registers.instruction_register =
+                unsafe { transmute::<(u8, u8), u16>((instr_low, instr_high)) };
+            
             let instruction_position_option = self
                 .position_memory
                 .get(self.registers.program_counter as usize)
                 .cloned();
-            let (instr_high, instr_low) = (
-                match self.instruction_memory.get(instr_index) {
-                    Some(byte) => *byte,
-                    None => break 'execution_loop,
-                },
-                match self.instruction_memory.get(instr_index + 1) {
-                    Some(byte) => *byte,
-                    None => break 'execution_loop,
-                },
-            );
-
-            let instruction_format: u16 =
-                unsafe { transmute::<(u8, u8), u16>((instr_low, instr_high)) };
-
             // ==== PERFORMANCE DETECTOR ====
             /*
                This part of the code is used to detect non
@@ -87,7 +89,7 @@ impl Executable for Star {
                This is used to improve performance, as the
                instruction decoder is a costly operation.
             */
-            if instruction_format == 0b_0000_0000_0000_0000 {
+            if self.registers.instruction_register == 0b_0000_0000_0000_0000 {
                 // NOP instruction, just increment the program counter
                 if let Some(err) = self.increment_program_counter() {return Some((err, instruction_position_option));}
                 
@@ -95,9 +97,9 @@ impl Executable for Star {
             }
 
             // ==== INSTRUCTION DECODER ====
-            match Format::from_u16(instruction_format) {
+            match Format::from_u16(self.registers.instruction_register) {
                 Format::Trinity => {
-                    match defold_trinity(instruction_format) {
+                    match defold_trinity(self.registers.instruction_register) {
                         Some((instruction, reg1, reg2, reg3)) => {
                             match instruction {
                                 Instruction::Add => {
@@ -202,7 +204,7 @@ impl Executable for Star {
                     }
                 }
 
-                Format::Hime => match defold_hime(instruction_format) {
+                Format::Hime => match defold_hime(self.registers.instruction_register) {
                     Some((instruction, reg, imm)) => match instruction {
                         Instruction::Lai => {
                             let reg_v = self.registers.get(reg);
@@ -232,7 +234,7 @@ impl Executable for Star {
                     )),
                 },
 
-                Format::Pair => match defold_pair(instruction_format) {
+                Format::Pair => match defold_pair(self.registers.instruction_register) {
                     Some((instruction, reg1, reg2)) => match instruction {
                         Instruction::Mulhl => {
                             let reg1_v: u32 = extend_sign_from_u16_to_u32(self.registers.get(reg1));
@@ -368,7 +370,7 @@ impl Executable for Star {
                     )),
                 },
 
-                Format::Clover => match defold_clover(instruction_format) {
+                Format::Clover => match defold_clover(self.registers.instruction_register) {
                     Some((instruction, reg)) => match instruction {
                         Instruction::J => {
                             let reg_v = self.registers.get(reg);
@@ -390,11 +392,10 @@ impl Executable for Star {
                 },
 
                 Format::Ark => {
-                    match defold_ark(instruction_format) {
+                    match defold_ark(self.registers.instruction_register) {
                         Some(instruction) => {
                             match instruction {
                                 Instruction::Mcall => {
-
                                     let mut interface_option = self.interface.take();
 
                                     let should_break = if let Some(interface) = interface_option.as_mut() {

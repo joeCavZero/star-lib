@@ -22,6 +22,8 @@ pub struct Registers {
 
     // ==== OCULT REGISTERS ====
     pub program_counter: u16,
+    pub instruction_pointer: u32,
+    pub instruction_register: u16,
 }
 
 impl Registers {
@@ -44,6 +46,8 @@ impl Registers {
             return_address: rand::random::<u16>(),
             stack_pointer: (DATA_MEMORY_SIZE - 1) as u16,
             program_counter: 0,
+            instruction_pointer: rand::random::<u32>(),
+            instruction_register: rand::random::<u16>(),
         }
     }
 

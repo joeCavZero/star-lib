@@ -12,7 +12,7 @@ use crate::parseable::*;
 pub const DATA_MEMORY_SIZE: usize = 65536;
 
 pub struct Star {
-    pub file_table: HashMap<u32, String>,
+    pub file_table: HashMap<usize, String>,
     pub data_memory: [u8; DATA_MEMORY_SIZE],
     pub instruction_memory: Vec<u8>,
     pub position_memory: Vec<Position>,
@@ -37,9 +37,9 @@ impl Star {
         }
     }
 
-    pub fn load_from_assembly(&mut self, file_path: &String) -> Result<(SymbolTable, usize), (String, Option<Position>)> {        
+    pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(SymbolTable, usize), (String, Option<Position>)> {        
         
-        match self.scan(file_path) {
+        match self.scan_file(file_path) {
             Ok(ptokens) => {
                 match self.parse(&ptokens) {
                     Ok(mut ast) => {
@@ -76,10 +76,10 @@ impl Star {
         };
 
         self.file_table
-            .insert(self.file_table.len() as u32, absolute_file_path.clone());
+            .insert(self.file_table.len(), absolute_file_path.clone());
 
-        let id = match self.get_file_id_by_path(&absolute_file_path) {
-            Some(id) => id,
+        let id_option = match self.get_file_id_by_path(&absolute_file_path) {
+            Some(id) => Some(id),
             None => {
                 return Some((
                     format!("File '{}' not found in file table", absolute_file_path),
@@ -100,13 +100,13 @@ impl Star {
 
         let mut section = ".instr".to_string();
 
-        let mut actual_line: u32 = 1;
-        let mut actual_column: u32 = 1;
+        let mut actual_line: usize = 1;
+        let mut actual_column: usize = 1;
 
         let mut data_memory_vector: Vec<u8> = Vec::new();
 
-        let mut tkn_line: u32 = 1;
-        let mut tkn_column: u32 = 1;
+        let mut tkn_line: usize = 1;
+        let mut tkn_column: usize = 1;
 
         let mut line_has_identation = false;
 
@@ -148,7 +148,7 @@ impl Star {
                                         return Some((
                                             "Invalid binary instruction".to_string(),
                                             Some(Position::new(
-                                                id,
+                                                id_option,
                                                 tkn_line,
                                                 Some(tkn_column),
                                             )),
@@ -158,7 +158,7 @@ impl Star {
 
                                 if self.instruction_memory.len() % 2 == 0 {
                                     self.position_memory.push(Position::new(
-                                        id,
+                                        id_option,
                                         tkn_line,
                                         if line_has_identation {
                                             Some(actual_column)
@@ -181,7 +181,7 @@ impl Star {
                                         return Some((
                                             "Invalid binary data".to_string(),
                                             Some(Position::new(
-                                                id,
+                                                id_option,
                                                 tkn_line,
                                                 Some(tkn_column),
                                             )),
@@ -193,7 +193,7 @@ impl Star {
                             _ => {
                                 return Some((
                                     "Unknown section".to_string(),
-                                    Some(Position::new(id, tkn_line, Some(tkn_column))),
+                                    Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                                 ));
                             }
                         }
@@ -227,7 +227,7 @@ impl Star {
                         Err(_) => {
                             return Some((
                                 "Invalid binary instruction".to_string(),
-                                Some(Position::new(id, tkn_line, Some(tkn_column))),
+                                Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                             ))
                         }
                     };
@@ -236,7 +236,7 @@ impl Star {
 
                     if self.instruction_memory.len() % 2 == 0 {
                         self.position_memory.push(Position::new(
-                            id,
+                            id_option,
                             tkn_line,
                             if line_has_identation {
                                 Some(actual_column)
@@ -256,7 +256,7 @@ impl Star {
                         Err(_) => {
                             return Some((
                                 "Invalid binary data".to_string(),
-                                Some(Position::new(id, tkn_line, Some(tkn_column))),
+                                Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                             ))
                         }
                     };
@@ -267,7 +267,7 @@ impl Star {
                 _ => {
                     return Some((
                         "Unknown section".to_string(),
-                        Some(Position::new(id, tkn_line, Some(tkn_column))),
+                        Some(Position::new(id_option, tkn_line, Some(tkn_column))),
                     ));
                 }
             }
@@ -283,8 +283,8 @@ impl Star {
         None
     }
 
-    pub fn save_binary(&self, file_path: &String, data_section_size: usize) -> Option<String> {
-        let mut file = match File::create(&file_path) {
+    pub fn save_binary(&self, file_path: &str, data_section_size: usize) -> Option<String> {
+        let mut file = match File::create(file_path.to_string()) {
             Ok(f) => f,
             Err(_) => return Some("Failed to create binary file".to_string()),
         };
@@ -323,11 +323,11 @@ impl Star {
         None
     }
     
-    pub fn get_file_id_by_path(&self, file_path: &String) -> Option<u32> {
+    pub fn get_file_id_by_path(&self, file_path: &String) -> Option<usize> {
         self.file_table.iter().find_map(|(id, path)| if path == file_path { Some(*id) } else { None })
     }
 
-    pub fn get_file_name(&self, file_id: u32) -> String {
+    pub fn get_file_name(&self, file_id: usize) -> String {
         match self.file_table.get(&file_id) {
             Some(name) => name.clone(),
             None => "Unknown file".to_string(),
