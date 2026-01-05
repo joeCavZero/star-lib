@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Processor {
+pub enum StarProcessor {
     Include,
     Define,
     Once,

@@ -4,15 +4,14 @@ use crate::core::*;
 use crate::math::*;
 use crate::parseable::*;
 use crate::resolveable::*;
-use crate::utils::*;
 
-pub trait Symbolable {
-    fn get_symbol_table(&self, ast: &mut Ast) -> Result<SymbolTable, (String, Position)>;
+pub trait StarSymbolable {
+    fn get_symbol_table(&self, ast: &mut Ast) -> Result<StarSymbolTable, (String, StarPosition)>;
 }
 
-impl Symbolable for Star {
-    fn get_symbol_table(&self, ast: &mut Ast) -> Result<SymbolTable, (String, Position)> {
-        let mut symbol_table: SymbolTable = HashMap::new();
+impl StarSymbolable for Star {
+    fn get_symbol_table(&self, ast: &mut Ast) -> Result<StarSymbolTable, (String, StarPosition)> {
+        let mut symbol_table: StarSymbolTable = HashMap::new();
 
         // >>>> DATA MEMORY <<<<
         let mut data_memory_counter: usize = 0;
@@ -21,7 +20,7 @@ impl Symbolable for Star {
             // ==== Process of collecting labels ====
             for label_ptk in data_camp.label_declarations.iter() {
                 match label_ptk.token {
-                    Token::LabelDeclaration(ref label_name) => {
+                    StarToken::LabelDeclaration(ref label_name) => {
                         if symbol_table.contains_key(label_name) {
                             return Err((
                                 format!("Label '{}' already declared", label_name),
@@ -51,7 +50,7 @@ impl Symbolable for Star {
             // ==== Process of moving the data memory counter ====
             match data_camp.directive.token {
                 // ==== BYTE DIRECTIVE ====
-                Token::Directive(Directive::Byte) => {
+                StarToken::StarDirective(StarDirective::Byte) => {
                     if let DataCampArg::Multiple(ref ptk_args) = data_camp.arg {
                         for ptk_arg in ptk_args.iter() {
                             match data_memory_counter.checked_add(1) {
@@ -79,7 +78,7 @@ impl Symbolable for Star {
                 }
 
                 // ==== WORD DIRECTIVE ====
-                Token::Directive(Directive::Word) => {
+                StarToken::StarDirective(StarDirective::Word) => {
                     if let DataCampArg::Multiple(ref ptk_args) = data_camp.arg {
                         for ptk_arg in ptk_args.iter() {
                             match data_memory_counter.checked_add(2) {
@@ -107,10 +106,10 @@ impl Symbolable for Star {
                 }
 
                 // ==== SPACE DIRECTIVE ====
-                Token::Directive(Directive::Space) => {
+                StarToken::StarDirective(StarDirective::Space) => {
                     if let DataCampArg::Unique(ref ptk_arg) = data_camp.arg {
                         match ptk_arg.token {
-                            Token::NumberLiteral(ref num_string) => {
+                            StarToken::NumberLiteral(ref num_string) => {
                                 let num = match u16_from_string(num_string.clone()) {
                                     Ok(n) => n,
                                     Err(err) => {
@@ -145,13 +144,13 @@ impl Symbolable for Star {
                 }
 
                 // ==== STRING AND STRINGZ DIRECTIVES ====
-                Token::Directive(Directive::String)
-                | Token::Directive(Directive::Stringz) => {
+                StarToken::StarDirective(StarDirective::String)
+                | StarToken::StarDirective(StarDirective::Stringz) => {
                     if let DataCampArg::Unique(ref ptk_arg) = data_camp.arg {
                         match ptk_arg.token {
-                            Token::StringLiteral(ref string_literal) => {
+                            StarToken::StringLiteral(ref string_literal) => {
                                 let mut string_len = string_literal.len();
-                                if data_camp.directive.token == Token::Directive(Directive::Stringz)
+                                if data_camp.directive.token == StarToken::StarDirective(StarDirective::Stringz)
                                 {
                                     string_len += 1; // null terminator add
                                 }
@@ -192,7 +191,7 @@ impl Symbolable for Star {
                     }
                 }
 
-                Token::Directive(Directive::Checkpoint) => {
+                StarToken::StarDirective(StarDirective::Checkpoint) => {
                     if let DataCampArg::Empty = data_camp.arg {
                         // Nothing to do here
                     } else {
@@ -208,7 +207,7 @@ impl Symbolable for Star {
         for (instruction_index, instruction) in ast.instr_field.iter().enumerate() {
             for label_ptk in instruction.label_declarations.iter() {
                 match label_ptk.token {
-                    Token::LabelDeclaration(ref label_name) => {
+                    StarToken::LabelDeclaration(ref label_name) => {
                         if symbol_table.contains_key(label_name) {
                             return Err((
                                 format!("Label '{}' already declared", label_name),

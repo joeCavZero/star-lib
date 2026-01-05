@@ -7,16 +7,15 @@ use crate::math::split_u16_to_strings;
 use crate::math::u16_from_string;
 use crate::math::u8_from_string;
 use crate::parseable::*;
-use crate::utils::*;
 
-pub trait Generateable {
-    fn generate(&mut self, ast: &Ast) -> Result<usize, (String, Position)>;
-    fn generate_data_memory(&mut self, ast: &Ast) -> Result<usize, (String, Position)>;
-    fn generate_instruction_memory(&mut self, ast: &Ast) -> Option<(String, Position)>;
+pub trait StarGenerateable {
+    fn generate(&mut self, ast: &Ast) -> Result<usize, (String, StarPosition)>;
+    fn generate_data_memory(&mut self, ast: &Ast) -> Result<usize, (String, StarPosition)>;
+    fn generate_instruction_memory(&mut self, ast: &Ast) -> Option<(String, StarPosition)>;
 }
 
-impl Generateable for Star {
-    fn generate(&mut self, ast: &Ast) -> Result<usize, (String, Position)> {
+impl StarGenerateable for Star {
+    fn generate(&mut self, ast: &Ast) -> Result<usize, (String, StarPosition)> {
         match self.generate_data_memory(ast) {
             Ok(data_section_size) => {
                 self.generate_instruction_memory(ast);
@@ -27,21 +26,21 @@ impl Generateable for Star {
         
     }
 
-    fn generate_data_memory(&mut self, ast: &Ast) -> Result<usize, (String, Position)> {
+    fn generate_data_memory(&mut self, ast: &Ast) -> Result<usize, (String, StarPosition)> {
         let mut is_data_section_empty = true;
         let mut data_memory_pointer: usize = 0;
         for data_camp in ast.data_field.iter() {
             is_data_section_empty = false;
             match data_camp.directive.token {
-                Token::Directive(Directive::Byte)
-                | Token::Directive(Directive::Word)
+                StarToken::StarDirective(StarDirective::Byte)
+                | StarToken::StarDirective(StarDirective::Word)
                 => {
 
                     if let DataCampArg::Multiple(values) = &data_camp.arg {
                         for val_ptk in values.iter() {
-                            if let Token::NumberLiteral(num_string) = &val_ptk.token {
+                            if let StarToken::NumberLiteral(num_string) = &val_ptk.token {
                                 match data_camp.directive.token {
-                                    Token::Directive(Directive::Byte) => {
+                                    StarToken::StarDirective(StarDirective::Byte) => {
                                         match u8_from_string((*num_string).to_string()) {
                                             Ok(num) => {
                                                 match self.data_memory.get_mut(data_memory_pointer) {
@@ -65,7 +64,7 @@ impl Generateable for Star {
                                             }
                                         }
                                     }
-                                    Token::Directive(Directive::Word) => {
+                                    StarToken::StarDirective(StarDirective::Word) => {
                                         match u16_from_string((*num_string).to_string()) {
                                             Ok(num) => {
                                                 let (low, high) = split_u16_to_strings(num);
@@ -108,9 +107,9 @@ impl Generateable for Star {
                         unreachable!();
                     }
                 }
-                Token::Directive(Directive::Space) => {
+                StarToken::StarDirective(StarDirective::Space) => {
                     if let DataCampArg::Unique(value) = data_camp.arg.clone() {
-                        if let Token::NumberLiteral(num_string) = value.token {
+                        if let StarToken::NumberLiteral(num_string) = value.token {
                             match u16_from_string((*num_string).to_string()) {
                                 Ok(num) => {
                                     data_memory_pointer += num as usize;
@@ -129,10 +128,10 @@ impl Generateable for Star {
                         unreachable!();
                     }
                 }
-                Token::Directive(Directive::String)
-                | Token::Directive(Directive::Stringz) => {
+                StarToken::StarDirective(StarDirective::String)
+                | StarToken::StarDirective(StarDirective::Stringz) => {
                     if let DataCampArg::Unique(value) = data_camp.arg.clone() {
-                        if let Token::StringLiteral(string) = value.token {
+                        if let StarToken::StringLiteral(string) = value.token {
                             let string_bytes = string.as_bytes();
                             for &byte in string_bytes.iter() {
                                 if let Some(data_byte) = self.data_memory.get_mut(data_memory_pointer) {
@@ -147,7 +146,7 @@ impl Generateable for Star {
                             }
 
                             // If it's a null-terminated string, add a null byte
-                            if data_camp.directive.token == Token::Directive(Directive::Stringz) {
+                            if data_camp.directive.token == StarToken::StarDirective(StarDirective::Stringz) {
                                 if let Some(data_byte) = self.data_memory.get_mut(data_memory_pointer) {
                                     *data_byte = 0; // Null terminator
                                     data_memory_pointer += 1;
@@ -165,7 +164,7 @@ impl Generateable for Star {
                         unreachable!();
                     }
                 }
-                Token::Directive(Directive::Checkpoint) => {
+                StarToken::StarDirective(StarDirective::Checkpoint) => {
                     if let DataCampArg::Empty = data_camp.arg {
                         // Nothing to do here, just a checkpoint
                     } else {
@@ -185,13 +184,13 @@ impl Generateable for Star {
             return Ok(data_memory_pointer);
         }
     }
-    fn generate_instruction_memory(&mut self, ast: &Ast) -> Option<(String, Position)> {
+    fn generate_instruction_memory(&mut self, ast: &Ast) -> Option<(String, StarPosition)> {
         for instr_camp in ast.instr_field.iter() {
-            if let Token::Instruction(instruction) = instr_camp.instruction.token.clone() {
+            if let StarToken::StarInstruction(instruction) = instr_camp.instruction.token.clone() {
                 match instruction.format() {
-                    Format::Trinity => {
-                        if let Sequence::Three(reg_ptk_1, reg_ptk_2, reg_ptk_3) = instr_camp.sequence.clone() {
-                            if let (Token::GeneralRegister(reg1), Token::GeneralRegister(reg2), Token::GeneralRegister(reg3)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone(), reg_ptk_3.token.clone()) {
+                    StarFormat::Trinity => {
+                        if let StarSequence::Three(reg_ptk_1, reg_ptk_2, reg_ptk_3) = instr_camp.sequence.clone() {
+                            if let (StarToken::StarGeneralRegister(reg1), StarToken::StarGeneralRegister(reg2), StarToken::StarGeneralRegister(reg3)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone(), reg_ptk_3.token.clone()) {
                                 let format: u16 = fold_trinity(
                                     instruction,
                                     reg1,
@@ -211,9 +210,9 @@ impl Generateable for Star {
                             unreachable!();
                         }
                     }
-                    Format::Hime => {
-                        if let Sequence::Two(reg_ptk, imm_ptk) = instr_camp.sequence.clone() {
-                            if let (Token::GeneralRegister(reg), Token::NumberLiteral(imm_string)) = (reg_ptk.token.clone(), imm_ptk.token.clone()) {
+                    StarFormat::Hime => {
+                        if let StarSequence::Two(reg_ptk, imm_ptk) = instr_camp.sequence.clone() {
+                            if let (StarToken::StarGeneralRegister(reg), StarToken::NumberLiteral(imm_string)) = (reg_ptk.token.clone(), imm_ptk.token.clone()) {
                                 match u8_from_string(imm_string) {
                                     Ok(imm) => {
                                         let format: u16 = fold_hime(
@@ -242,9 +241,9 @@ impl Generateable for Star {
                             unreachable!();
                         }
                     }
-                    Format::Pair => {
-                        if let Sequence::Two(reg_ptk_1, reg_ptk_2) = instr_camp.sequence.clone() {
-                            if let (Token::GeneralRegister(reg1), Token::GeneralRegister(reg2)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone()) {
+                    StarFormat::Pair => {
+                        if let StarSequence::Two(reg_ptk_1, reg_ptk_2) = instr_camp.sequence.clone() {
+                            if let (StarToken::StarGeneralRegister(reg1), StarToken::StarGeneralRegister(reg2)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone()) {
                                 let format: u16 = fold_pair(
                                     instruction,
                                     reg1,
@@ -263,9 +262,9 @@ impl Generateable for Star {
                             unreachable!();
                         }
                     }
-                    Format::Clover => {
-                        if let Sequence::One(reg_ptk) = instr_camp.sequence.clone() {
-                            if let Token::GeneralRegister(reg) = reg_ptk.token.clone() {
+                    StarFormat::Clover => {
+                        if let StarSequence::One(reg_ptk) = instr_camp.sequence.clone() {
+                            if let StarToken::StarGeneralRegister(reg) = reg_ptk.token.clone() {
                                 let format: u16 = fold_clover(
                                     instruction,
                                     reg,
@@ -283,8 +282,8 @@ impl Generateable for Star {
                             unreachable!();
                         }
                     }
-                    Format::Ark => {
-                        if let Sequence::Zero = instr_camp.sequence.clone() {
+                    StarFormat::Ark => {
+                        if let StarSequence::Zero = instr_camp.sequence.clone() {
                             let format: u16 = fold_ark(instruction);
                             
                             self.position_memory.push(instr_camp.instruction.position);

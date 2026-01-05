@@ -1,7 +1,8 @@
-use crate::{core::DATA_MEMORY_SIZE, utils::GeneralRegister};
+use crate::core::DATA_MEMORY_SIZE;
+use crate::core::StarGeneralRegister;
 
 #[derive(Debug, Clone)]
-pub struct Registers {
+pub struct StarRegisters {
     // ==== GENERAL REGISTERS ====
     pub zero: u16,
     pub a: u16,
@@ -26,7 +27,7 @@ pub struct Registers {
     pub instruction_register: u16,
 }
 
-impl Registers {
+impl StarRegisters {
     pub fn new() -> Self {
         Self {
             zero: 0,
@@ -51,45 +52,57 @@ impl Registers {
         }
     }
 
-    pub fn get(&self, register: GeneralRegister) -> u16 {
+    pub fn get_general_register_value(&self, register: StarGeneralRegister) -> u16 {
         match register {
-            GeneralRegister::Zero => self.zero,
-            GeneralRegister::A => self.a,
-            GeneralRegister::B => self.b,
-            GeneralRegister::C => self.c,
-            GeneralRegister::D => self.d,
-            GeneralRegister::E => self.e,
-            GeneralRegister::F => self.f,
-            GeneralRegister::G => self.g,
-            GeneralRegister::Aux1 => self.aux1,
-            GeneralRegister::Aux2 => self.aux2,
-            GeneralRegister::Aux3 => self.aux3,
-            GeneralRegister::Carry => self.carry,
-            GeneralRegister::Low => self.low,
-            GeneralRegister::High => self.high,
-            GeneralRegister::ReturnAddress => self.return_address,
-            GeneralRegister::StackPointer => self.stack_pointer,
+            StarGeneralRegister::Zero => self.zero,
+            StarGeneralRegister::A => self.a,
+            StarGeneralRegister::B => self.b,
+            StarGeneralRegister::C => self.c,
+            StarGeneralRegister::D => self.d,
+            StarGeneralRegister::E => self.e,
+            StarGeneralRegister::F => self.f,
+            StarGeneralRegister::G => self.g,
+            StarGeneralRegister::Aux1 => self.aux1,
+            StarGeneralRegister::Aux2 => self.aux2,
+            StarGeneralRegister::Aux3 => self.aux3,
+            StarGeneralRegister::Carry => self.carry,
+            StarGeneralRegister::Low => self.low,
+            StarGeneralRegister::High => self.high,
+            StarGeneralRegister::ReturnAddress => self.return_address,
+            StarGeneralRegister::StackPointer => self.stack_pointer,
         }
     }
 
-    pub fn set(&mut self, register: GeneralRegister, value: u16) {
+    pub fn set_general_register_value(&mut self, register: StarGeneralRegister, value: u16) {
         match register {
-            GeneralRegister::Zero => {}
-            GeneralRegister::A => self.a = value,
-            GeneralRegister::B => self.b = value,
-            GeneralRegister::C => self.c = value,
-            GeneralRegister::D => self.d = value,
-            GeneralRegister::E => self.e = value,
-            GeneralRegister::F => self.f = value,
-            GeneralRegister::G => self.g = value,
-            GeneralRegister::Aux1 => self.aux1 = value,
-            GeneralRegister::Aux2 => self.aux2 = value,
-            GeneralRegister::Aux3 => self.aux3 = value,
-            GeneralRegister::Carry => self.carry = value,
-            GeneralRegister::Low => self.low = value,
-            GeneralRegister::High => self.high = value,
-            GeneralRegister::ReturnAddress => self.return_address = value,
-            GeneralRegister::StackPointer => self.stack_pointer = value,
+            StarGeneralRegister::Zero => {}
+            StarGeneralRegister::A => self.a = value,
+            StarGeneralRegister::B => self.b = value,
+            StarGeneralRegister::C => self.c = value,
+            StarGeneralRegister::D => self.d = value,
+            StarGeneralRegister::E => self.e = value,
+            StarGeneralRegister::F => self.f = value,
+            StarGeneralRegister::G => self.g = value,
+            StarGeneralRegister::Aux1 => self.aux1 = value,
+            StarGeneralRegister::Aux2 => self.aux2 = value,
+            StarGeneralRegister::Aux3 => self.aux3 = value,
+            StarGeneralRegister::Carry => self.carry = value,
+            StarGeneralRegister::Low => self.low = value,
+            StarGeneralRegister::High => self.high = value,
+            StarGeneralRegister::ReturnAddress => self.return_address = value,
+            StarGeneralRegister::StackPointer => self.stack_pointer = value,
+        }
+    }
+
+    pub fn increment_program_counter(&mut self) -> Result<(), String>{
+        match self.program_counter.checked_add(1) {
+            Some(new_pc) => {
+                self.program_counter = new_pc;
+                return Ok(());
+            }
+            None => {
+                return Err("Program counter overflow".to_string());
+            }
         }
     }
 }

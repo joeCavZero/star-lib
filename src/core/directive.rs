@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Directive {
+pub enum StarDirective {
     Data,
     Instr,
     Byte,

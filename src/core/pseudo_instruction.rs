@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PseudoInstruction {
+pub enum StarPseudoInstruction {
     // ==== Memory Pseudo Instructions ====
     Nope, // --> add $zero, $zero, $zero
     Move, // move -- move $rd, $rs
@@ -49,16 +49,16 @@ pub enum PseudoInstruction {
     Ret, // return -- ret
 }
 
-impl PseudoInstruction {
+impl StarPseudoInstruction {
     pub fn is_addressed(&self) -> bool {
         match self {
-            PseudoInstruction::La
-            | PseudoInstruction::Beqa
-            | PseudoInstruction::Bneqa
-            | PseudoInstruction::Bgta
-            | PseudoInstruction::Blta
-            | PseudoInstruction::Bgtua
-            | PseudoInstruction::Bltua => true,
+            StarPseudoInstruction::La
+            | StarPseudoInstruction::Beqa
+            | StarPseudoInstruction::Bneqa
+            | StarPseudoInstruction::Bgta
+            | StarPseudoInstruction::Blta
+            | StarPseudoInstruction::Bgtua
+            | StarPseudoInstruction::Bltua => true,
             _ => false,
         }
     }

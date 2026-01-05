@@ -5,14 +5,14 @@ use crate::core::*;
 use crate::utils::*;
 use crate::scannable::positioned_tokens_vectorable::*;
 
-type MacroTable = HashMap<String, (Vec<PositionedToken>, Vec<PositionedToken>)>;
+type MacroTable = HashMap<String, (Vec<StarPositionedToken>, Vec<StarPositionedToken>)>;
 
-pub trait Scannable {
+pub trait StarScannable {
     fn scan_file(&mut self, base_file_path: &str)
-        -> Result<Vec<PositionedToken>, (String, Option<Position>)>;
+        -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)>;
 
     fn scan(&mut self, source: &String)
-        -> Result<Vec<PositionedToken>, (String, Option<Position>)>;
+        -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)>;
 
     fn scan_and_resolve_processors(
         &mut self,
@@ -24,26 +24,26 @@ pub trait Scannable {
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
-    ) -> Result<Vec<PositionedToken>, (String, Option<Position>)>;
+    ) -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)>;
 
     fn resolve_processors_common(
         &mut self,
         absolute_file_path: &String,
         file_id: usize,
-        ptokens: &mut Vec<PositionedToken>,
+        ptokens: &mut Vec<StarPositionedToken>,
         file_counter: &mut usize,
         file_dependency_table: &mut HashMap<usize, HashSet<usize>>,
         macro_table: &mut MacroTable,
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
-    ) -> Result<(), (String, Option<Position>)> ;
+    ) -> Result<(), (String, Option<StarPosition>)> ;
 }
 
 
-impl Scannable for Star {
+impl StarScannable for Star {
     fn scan_file(&mut self, base_file_path: &str)
-        -> Result<Vec<PositionedToken>, (String, Option<Position>)>
+        -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)>
     {
         let base_file_path_string = base_file_path.to_string();
 
@@ -66,7 +66,7 @@ impl Scannable for Star {
     }
 
     fn scan(&mut self, source: &String)
-        -> Result<Vec<PositionedToken>, (String, Option<Position>)>
+        -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)>
     {
         let mut file_dependency_table: HashMap<usize, HashSet<usize>> = HashMap::new();
         let mut macro_table: MacroTable = HashMap::new();
@@ -116,7 +116,7 @@ impl Scannable for Star {
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
-    ) -> Result<Vec<PositionedToken>, (String, Option<Position>)> {
+    ) -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)> {
         use std::fs;
 
         // ==== GETTING THE ABSOLUTE FILE PATH STRING ====
@@ -156,7 +156,7 @@ impl Scannable for Star {
         processing_stack.insert(file_id);
 
         // ==== SCANNING THE FILE CONTENT ====
-        let mut ptokens: Vec<PositionedToken> =
+        let mut ptokens: Vec<StarPositionedToken> =
             match scan_positioned_tokens_from_file(&absolute_file_path, file_id) {
                 Ok(tkns) => tkns,
                 Err((err, position_option)) => {
@@ -195,14 +195,14 @@ impl Scannable for Star {
         &mut self,
         absolute_file_path: &String,
         file_id: usize,
-        ptokens: &mut Vec<PositionedToken>,
+        ptokens: &mut Vec<StarPositionedToken>,
         file_counter: &mut usize,
         file_dependency_table: &mut HashMap<usize, HashSet<usize>>,
         macro_table: &mut MacroTable,
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
-    ) -> Result<(), (String, Option<Position>)> {
+    ) -> Result<(), (String, Option<StarPosition>)> {
         // ==== RESOLVING INCLUDES / DEFINES / ONCE / MACROS ====
         let mut token_counter: usize = 0;
         let mut ptokens_len: usize = ptokens.len();
@@ -214,7 +214,7 @@ impl Scannable for Star {
             };
 
             match tk.token.clone() {
-                Token::Processor(Processor::Include) => {
+                StarToken::StarProcessor(StarProcessor::Include) => {
                     if !file_mode {
                         return Err((
                             "You should not use includes in this mode".to_string(),
@@ -224,7 +224,7 @@ impl Scannable for Star {
 
                     match ptokens.get(token_counter + 1).cloned() {
                         Some(next_p_tkn) => {
-                            if let Token::StringLiteral(include_path_literal_string) =
+                            if let StarToken::StringLiteral(include_path_literal_string) =
                                 next_p_tkn.token.clone()
                             {
                                 let included_ptokens = match self.scan_and_resolve_processors(
@@ -276,10 +276,10 @@ impl Scannable for Star {
                     }
                 }
 
-                Token::Processor(Processor::Define) => {
+                StarToken::StarProcessor(StarProcessor::Define) => {
                     match ptokens.get(token_counter + 1).cloned() {
                         Some(define_identifier_ptkn) => match define_identifier_ptkn.token {
-                            Token::Identifier(identifier_string) => {
+                            StarToken::Identifier(identifier_string) => {
                                 let (macro_head, macro_definition_head_tkns_found) =
                                     match ptokens.scan_macro_definition_head(
                                         token_counter + 2,
@@ -332,7 +332,7 @@ impl Scannable for Star {
                     }
                 }
 
-                Token::Processor(Processor::Once) => {
+                StarToken::StarProcessor(StarProcessor::Once) => {
                     match once_set.get(absolute_file_path) {
                         Some(_) => {
                             while token_counter < ptokens.len() {
@@ -350,7 +350,7 @@ impl Scannable for Star {
                     }
                 }
 
-                Token::Identifier(identifier_string) => {
+                StarToken::Identifier(identifier_string) => {
                     if let Some((macro_head, define_sequence)) = macro_table.get(&identifier_string)
                     {
                         let (macro_call_head, head_tokens_quantity_found) =
@@ -374,7 +374,7 @@ impl Scannable for Star {
                         for (i, macro_call_arg) in macro_call_head.iter().enumerate() {
                             let definition_arg_string = match macro_head.get(i) {
                                 Some(arg) => {
-                                    if let Token::MacroArgIdentifier(arg_name) = arg.token.clone() {
+                                    if let StarToken::MacroArgIdentifier(arg_name) = arg.token.clone() {
                                         arg_name
                                     } else {
                                         return Err((
@@ -395,7 +395,7 @@ impl Scannable for Star {
                             };
 
                             for df_sq_ptkn in ptkns_to_substitute.iter_mut() {
-                                if let Token::MacroArgIdentifier(df_sq_macro_arg_name) =
+                                if let StarToken::MacroArgIdentifier(df_sq_macro_arg_name) =
                                     df_sq_ptkn.token.clone()
                                 {
                                     if df_sq_macro_arg_name == definition_arg_string {
@@ -406,7 +406,7 @@ impl Scannable for Star {
                         }
 
                         for df_sq_ptkn in ptkns_to_substitute.iter() {
-                            if let Token::MacroArgIdentifier(df_sq_macro_arg_name) =
+                            if let StarToken::MacroArgIdentifier(df_sq_macro_arg_name) =
                                 df_sq_ptkn.token.clone()
                             {
                                 return Err((
@@ -465,7 +465,7 @@ fn read_file_content(file_path: &String) -> Result<String, String> {
 fn scan_positioned_tokens_from_file(
     file_path: &String,
     file_id: usize,
-) -> Result<Vec<PositionedToken>, (String, Option<Position>)> {
+) -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)> {
     match read_file_content(file_path) {
         Ok(content) => scan_positioned_tokens_from_str(&content, file_id),
         Err(err) => Err((err, None)),
@@ -474,10 +474,10 @@ fn scan_positioned_tokens_from_file(
 fn scan_positioned_tokens_from_str(
     content: &str,
     file_id: usize,
-) -> Result<Vec<PositionedToken>, (String, Option<Position>)> {
+) -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)> {
     let content = content.replace("\r", ""); // normaliza CRLF
 
-    let mut tokens: Vec<PositionedToken> = Vec::new();
+    let mut tokens: Vec<StarPositionedToken> = Vec::new();
     let mut token_accumulator = String::new();
 
     let mut actual_line = 1;
@@ -520,7 +520,7 @@ fn scan_positioned_tokens_from_str(
                     ) {
                         return Err((
                             e,
-                            Some(Position::new(
+                            Some(StarPosition::new(
                                 Some(file_id),
                                 actual_line,
                                 Some(initial_token_column),
@@ -550,7 +550,7 @@ fn scan_positioned_tokens_from_str(
                         ) {
                             return Err((
                                 e,
-                                Some(Position::new(
+                                Some(StarPosition::new(
                                     Some(file_id),
                                     actual_line,
                                     Some(initial_token_column),
@@ -587,7 +587,7 @@ fn scan_positioned_tokens_from_str(
                     ) {
                         return Err((
                             e,
-                            Some(Position::new(
+                            Some(StarPosition::new(
                                 Some(file_id),
                                 actual_line,
                                 Some(initial_token_column),
@@ -620,7 +620,7 @@ fn scan_positioned_tokens_from_str(
                     ) {
                         return Err((
                             e,
-                            Some(Position::new(
+                            Some(StarPosition::new(
                                 Some(file_id),
                                 actual_line,
                                 Some(initial_token_column),
@@ -643,7 +643,7 @@ fn scan_positioned_tokens_from_str(
                         ) {
                             return Err((
                                 e,
-                                Some(Position::new(
+                                Some(StarPosition::new(
                                     Some(file_id),
                                     actual_line,
                                     Some(initial_token_column),
@@ -682,7 +682,7 @@ fn scan_positioned_tokens_from_str(
                     ) {
                         return Err((
                             e,
-                            Some(Position::new(
+                            Some(StarPosition::new(
                                 Some(file_id),
                                 actual_line,
                                 Some(initial_token_column),
@@ -705,7 +705,7 @@ fn scan_positioned_tokens_from_str(
                 ) {
                     return Err((
                         e,
-                        Some(Position::new(
+                        Some(StarPosition::new(
                             Some(file_id),
                             actual_line,
                             Some(initial_token_column),
@@ -741,7 +741,7 @@ fn scan_positioned_tokens_from_str(
                     ) {
                         return Err((
                             e,
-                            Some(Position::new(
+                            Some(StarPosition::new(
                                 Some(file_id),
                                 actual_line,
                                 Some(initial_token_column),
@@ -775,7 +775,7 @@ fn scan_positioned_tokens_from_str(
         ) {
             return Err((
                 e,
-                Some(Position::new(Some(file_id), actual_line, Some(initial_token_column))),
+                Some(StarPosition::new(Some(file_id), actual_line, Some(initial_token_column))),
             ));
         }
     }

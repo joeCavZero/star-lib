@@ -1,23 +1,22 @@
-use crate::utils::*;
 use crate::core::*;
 use super::ast::*;
 use super::reader::*;
 use super::sequence::*;
 
-pub trait Parseable {
-    fn parse(&self, ptokens: &Vec<PositionedToken>) -> Result<Ast, (String, Position)>;
-    fn read_comma_separated_numbers(&self, ptokens: &Vec<PositionedToken>, start_index: usize) -> Vec<PositionedToken>;
+pub trait StarParseable {
+    fn parse(&self, ptokens: &Vec<StarPositionedToken>) -> Result<Ast, (String, StarPosition)>;
+    fn read_comma_separated_numbers(&self, ptokens: &Vec<StarPositionedToken>, start_index: usize) -> Vec<StarPositionedToken>;
 }
 
-impl Parseable for Star {
-    fn parse(&self, ptokens: &Vec<PositionedToken>) -> Result<Ast, (String, Position)> {
+impl StarParseable for Star {
+    fn parse(&self, ptokens: &Vec<StarPositionedToken>) -> Result<Ast, (String, StarPosition)> {
         let mut ast = Ast {
             data_field: Vec::new(),
             instr_field: Vec::new(),
         };
 
-        let mut field: Directive = Directive::Instr;
-        let mut label_declaration_accumulator: Vec<PositionedToken> = Vec::new();
+        let mut field: StarDirective = StarDirective::Instr;
+        let mut label_declaration_accumulator: Vec<StarPositionedToken> = Vec::new();
 
         let mut ptk_counter = 0;
         while ptk_counter < ptokens.len() {
@@ -28,38 +27,38 @@ impl Parseable for Star {
 
             match ptk.token {
                 // ==== Detect the current field ====
-                Token::Directive(Directive::Data) => {
-                    field = Directive::Data;
+                StarToken::StarDirective(StarDirective::Data) => {
+                    field = StarDirective::Data;
                     ptk_counter += 1;
                     continue;
                 }
-                Token::Directive(Directive::Instr) => {
-                    field = Directive::Instr;
+                StarToken::StarDirective(StarDirective::Instr) => {
+                    field = StarDirective::Instr;
                     ptk_counter += 1;
                     continue;
                 }
 
-                // ==== Case not is a Data or Instr Directive ====
+                // ==== Case not is a Data or Instr StarDirective ====
                 _ => {
                     match field {
                         // ==== Data Field ====
-                        Directive::Data => {
+                        StarDirective::Data => {
                             match ptk.token {
-                                Token::LabelDeclaration(_) => {
+                                StarToken::LabelDeclaration(_) => {
                                     label_declaration_accumulator.push(ptk.clone());
                                     ptk_counter += 1;
                                     continue;
                                 }
 
-                                Token::Directive(Directive::Byte)
-                                | Token::Directive(Directive::Word) => {
-                                    let data: Vec<PositionedToken> =
+                                StarToken::StarDirective(StarDirective::Byte)
+                                | StarToken::StarDirective(StarDirective::Word) => {
+                                    let data: Vec<StarPositionedToken> =
                                         self.read_comma_separated_numbers(ptokens, ptk_counter + 1);
 
                                     let data_len = data.len();
                                     if data_len == 0 {
                                         return Err((
-                                            "Directive expects at least one number".to_string(),
+                                            "StarDirective expects at least one number".to_string(),
                                             ptk.position.clone(),
                                         ));
                                     }
@@ -77,10 +76,10 @@ impl Parseable for Star {
                                     continue;
                                 }
 
-                                Token::Directive(Directive::Space) => {
+                                StarToken::StarDirective(StarDirective::Space) => {
                                     match ptokens.get(ptk_counter + 1) {
                                         Some(next_ptk) => {
-                                            if let Token::NumberLiteral(_) = next_ptk.token {
+                                            if let StarToken::NumberLiteral(_) = next_ptk.token {
                                                 ast.data_field.push(
                                                     DataCamp {
                                                         label_declarations: label_declaration_accumulator.clone(),
@@ -93,25 +92,25 @@ impl Parseable for Star {
                                                 continue;
                                             } else {
                                                 return Err((
-                                                    "Directive expects a number".to_string(),
+                                                    "StarDirective expects a number".to_string(),
                                                     ptk.position.clone(),
                                                 ));
                                             }
                                         }
                                         None => {
                                             return Err((
-                                                "Directive expects a number".to_string(),
+                                                "StarDirective expects a number".to_string(),
                                                 ptk.position.clone(),
                                             ));
                                         }
                                     };
                                 }
 
-                                Token::Directive(Directive::String)
-                                | Token::Directive(Directive::Stringz) => {
+                                StarToken::StarDirective(StarDirective::String)
+                                | StarToken::StarDirective(StarDirective::Stringz) => {
                                     match ptokens.get(ptk_counter + 1) {
                                         Some(next_ptk) => {
-                                            if let Token::StringLiteral(_) = next_ptk.token {
+                                            if let StarToken::StringLiteral(_) = next_ptk.token {
                                                 ast.data_field.push(
                                                     DataCamp {
                                                         label_declarations: label_declaration_accumulator.clone(),
@@ -124,21 +123,21 @@ impl Parseable for Star {
                                                 continue;
                                             } else {
                                                 return Err((
-                                                    "Directive expects a literal string".to_string(),
+                                                    "StarDirective expects a literal string".to_string(),
                                                     ptk.position.clone(),
                                                 ));
                                             }
                                         }
                                         None => {
                                             return Err((
-                                                "Directive expects a literal string".to_string(),
+                                                "StarDirective expects a literal string".to_string(),
                                                 ptk.position.clone(),
                                             ));
                                         }
                                     };
                                 }
 
-                                Token::Directive(Directive::Checkpoint) => {
+                                StarToken::StarDirective(StarDirective::Checkpoint) => {
                                     ast.data_field.push(
                                         DataCamp {
                                             label_declarations: label_declaration_accumulator.clone(),
@@ -160,25 +159,25 @@ impl Parseable for Star {
                             }
                         }
 
-                        // ==== Instruction Field ====
-                        Directive::Instr => {
+                        // ==== StarInstruction Field ====
+                        StarDirective::Instr => {
                             match ptk.token.clone() {
                                 // ==== Label Declaration ====
-                                Token::LabelDeclaration(_) => {
+                                StarToken::LabelDeclaration(_) => {
                                     label_declaration_accumulator.push(ptk.clone());
                                     ptk_counter += 1;
                                     continue;
                                 }
 
-                                Token::Instruction(instr) => {
+                                StarToken::StarInstruction(instr) => {
                                     match instr {
                                         // ==== READ NONE ====
-                                        Instruction::Mcall => {
+                                        StarInstruction::Mcall => {
                                             ast.instr_field.push(
                                                 InstrCamp {
                                                     label_declarations: label_declaration_accumulator.clone(),
                                                     instruction: ptk.clone(),
-                                                    sequence: Sequence::Zero,
+                                                    sequence: StarSequence::Zero,
                                                 }
                                             );
                                             ptk_counter += 1;
@@ -187,7 +186,7 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG ====
-                                        Instruction::J => {
+                                        StarInstruction::J => {
                                             match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -208,16 +207,16 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG REG ====
-                                        Instruction::Xlb
-                                        | Instruction::Lab
-                                        | Instruction::Llb
-                                        | Instruction::Sab
-                                        | Instruction::Slb
-                                        | Instruction::Mulhl
-                                        | Instruction::Divhl
-                                        | Instruction::Muluhl
-                                        | Instruction::Divuhl
-                                        | Instruction::Not => {
+                                        StarInstruction::Xlb
+                                        | StarInstruction::Lab
+                                        | StarInstruction::Llb
+                                        | StarInstruction::Sab
+                                        | StarInstruction::Slb
+                                        | StarInstruction::Mulhl
+                                        | StarInstruction::Divhl
+                                        | StarInstruction::Muluhl
+                                        | StarInstruction::Divuhl
+                                        | StarInstruction::Not => {
                                             match read_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -238,8 +237,8 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG IMM ====
-                                        Instruction::Lai
-                                        | Instruction::Lli => {
+                                        StarInstruction::Lai
+                                        | StarInstruction::Lli => {
                                             match read_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -260,19 +259,19 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG REG REG ====
-                                        Instruction::Add
-                                        | Instruction::Sub
-                                        | Instruction::And
-                                        | Instruction::Or
-                                        | Instruction::Xor
-                                        | Instruction::Shl
-                                        | Instruction::Shr
-                                        | Instruction::Beqr
-                                        | Instruction::Bneqr
-                                        | Instruction::Bgtr
-                                        | Instruction::Bltr
-                                        | Instruction::Bgtur
-                                        | Instruction::Bltur => {
+                                        StarInstruction::Add
+                                        | StarInstruction::Sub
+                                        | StarInstruction::And
+                                        | StarInstruction::Or
+                                        | StarInstruction::Xor
+                                        | StarInstruction::Shl
+                                        | StarInstruction::Shr
+                                        | StarInstruction::Beqr
+                                        | StarInstruction::Bneqr
+                                        | StarInstruction::Bgtr
+                                        | StarInstruction::Bltr
+                                        | StarInstruction::Bgtur
+                                        | StarInstruction::Bltur => {
                                             match read_r_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(three_seq) => {
                                                     ast.instr_field.push(
@@ -294,15 +293,15 @@ impl Parseable for Star {
                                     }
                                 }
 
-                                Token::PseudoInstruction(pseudo_instr) => {
+                                StarToken::StarPseudoInstruction(pseudo_instr) => {
                                     match pseudo_instr {
-                                        PseudoInstruction::Nope
-                                        | PseudoInstruction::Ret => {
+                                        StarPseudoInstruction::Nope
+                                        | StarPseudoInstruction::Ret => {
                                             ast.instr_field.push(
                                                 InstrCamp {
                                                     label_declarations: label_declaration_accumulator.clone(),
                                                     instruction: ptk.clone(),
-                                                    sequence: Sequence::Zero,
+                                                    sequence: StarSequence::Zero,
                                                 }
                                             );
                                             ptk_counter += 1;
@@ -310,9 +309,9 @@ impl Parseable for Star {
                                             continue;
                                         }
 
-                                        PseudoInstruction::Inc
-                                        | PseudoInstruction::Dec
-                                        | PseudoInstruction::Jr => {
+                                        StarPseudoInstruction::Inc
+                                        | StarPseudoInstruction::Dec
+                                        | StarPseudoInstruction::Jr => {
                                             match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -333,7 +332,7 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ IDENTIFIER ====
-                                        PseudoInstruction::Ja => {
+                                        StarPseudoInstruction::Ja => {
                                             match read_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -354,8 +353,8 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG REG ====
-                                        PseudoInstruction::Move
-                                        | PseudoInstruction::Swap => {
+                                        StarPseudoInstruction::Move
+                                        | StarPseudoInstruction::Swap => {
                                             match read_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -375,7 +374,7 @@ impl Parseable for Star {
                                             }
                                         }
 
-                                        PseudoInstruction::Li => {
+                                        StarPseudoInstruction::Li => {
                                             match read_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -396,7 +395,7 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG IDENTIFIER ====
-                                        PseudoInstruction::La => {
+                                        StarPseudoInstruction::La => {
                                             match read_r_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -417,9 +416,9 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG REG REG ====
-                                        PseudoInstruction::Mul
-                                        | PseudoInstruction::Div
-                                        | PseudoInstruction::Mod => {
+                                        StarPseudoInstruction::Mul
+                                        | StarPseudoInstruction::Div
+                                        | StarPseudoInstruction::Mod => {
                                             match read_r_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(three_seq) => {
                                                     ast.instr_field.push(
@@ -440,16 +439,16 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG REG NUMBER ====
-                                        PseudoInstruction::Addi
-                                        | PseudoInstruction::Subi
-                                        | PseudoInstruction::Andi
-                                        | PseudoInstruction::Ori
-                                        | PseudoInstruction::Xori
-                                        | PseudoInstruction::Shli
-                                        | PseudoInstruction::Shri
-                                        | PseudoInstruction::Muli
-                                        | PseudoInstruction::Divi
-                                        | PseudoInstruction::Modi => {
+                                        StarPseudoInstruction::Addi
+                                        | StarPseudoInstruction::Subi
+                                        | StarPseudoInstruction::Andi
+                                        | StarPseudoInstruction::Ori
+                                        | StarPseudoInstruction::Xori
+                                        | StarPseudoInstruction::Shli
+                                        | StarPseudoInstruction::Shri
+                                        | StarPseudoInstruction::Muli
+                                        | StarPseudoInstruction::Divi
+                                        | StarPseudoInstruction::Modi => {
                                             match read_r_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -470,10 +469,10 @@ impl Parseable for Star {
                                         }
 
                                         // READ REG REG SBRACKET NUMBER SBRACKET
-                                        PseudoInstruction::Lb
-                                        | PseudoInstruction::Lw
-                                        | PseudoInstruction::Sb
-                                        | PseudoInstruction::Sw => {
+                                        StarPseudoInstruction::Lb
+                                        | StarPseudoInstruction::Lw
+                                        | StarPseudoInstruction::Sb
+                                        | StarPseudoInstruction::Sw => {
                                             match read_r_r_br_n_br(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -494,12 +493,12 @@ impl Parseable for Star {
                                         }
 
                                         // ==== READ REG REG IDENTIFIER ====
-                                        PseudoInstruction::Beqa
-                                        | PseudoInstruction::Bneqa
-                                        | PseudoInstruction::Bgta
-                                        | PseudoInstruction::Blta
-                                        | PseudoInstruction::Bgtua
-                                        | PseudoInstruction::Bltua => {
+                                        StarPseudoInstruction::Beqa
+                                        | StarPseudoInstruction::Bneqa
+                                        | StarPseudoInstruction::Bgta
+                                        | StarPseudoInstruction::Blta
+                                        | StarPseudoInstruction::Bgtua
+                                        | StarPseudoInstruction::Bltua => {
                                             match read_r_r_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
                                                     ast.instr_field.push(
@@ -539,8 +538,8 @@ impl Parseable for Star {
         Ok(ast)
     }
 
-    fn read_comma_separated_numbers(&self, ptokens: &Vec<PositionedToken>, start_index: usize) -> Vec<PositionedToken> {
-        let mut numbers: Vec<PositionedToken> = Vec::new();
+    fn read_comma_separated_numbers(&self, ptokens: &Vec<StarPositionedToken>, start_index: usize) -> Vec<StarPositionedToken> {
+        let mut numbers: Vec<StarPositionedToken> = Vec::new();
         let mut index: usize = start_index;
 
         while index < ptokens.len() {
@@ -549,11 +548,11 @@ impl Parseable for Star {
                 None => break,
             };
             match ptk.token {
-                Token::NumberLiteral(_) => {
+                StarToken::NumberLiteral(_) => {
                     numbers.push(ptk.clone());
                     index += 1;
                 }
-                Token::Comma => {
+                StarToken::Comma => {
                     index += 1;
                 }
                 _ => break,

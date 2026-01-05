@@ -1,6 +1,6 @@
-use crate::utils::*;
+use crate::core::*;
 
-pub trait PositionedTokensVectorable {
+pub trait StarPositionedTokensVectorable {
     fn push_positioned_token(
         &mut self,
         token_string: String,
@@ -12,23 +12,23 @@ pub trait PositionedTokensVectorable {
     fn scan_macro_definition_head(
         &self,
         vector_offset: usize,
-        identifier_position: Position,
-    ) -> Result<(Vec<PositionedToken>, usize), (String, Position)>;
+        identifier_position: StarPosition,
+    ) -> Result<(Vec<StarPositionedToken>, usize), (String, StarPosition)>;
 
     fn scan_macro_sequence(
         &self,
         start_index: usize,
         identifier_line: usize,
-    ) -> Result<(Vec<PositionedToken>, usize), (String, Position)>;
+    ) -> Result<(Vec<StarPositionedToken>, usize), (String, StarPosition)>;
 
     fn scan_macro_calling_head(
         &self,
         vector_offset: usize,
-        identifier_position: Position,
-    ) -> Result<(Vec<PositionedToken>, usize), (String, Position)>;
+        identifier_position: StarPosition,
+    ) -> Result<(Vec<StarPositionedToken>, usize), (String, StarPosition)>;
 }
 
-impl PositionedTokensVectorable for Vec<PositionedToken> {
+impl StarPositionedTokensVectorable for Vec<StarPositionedToken> {
     fn push_positioned_token(
         &mut self,
         token_string: String,
@@ -36,12 +36,12 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
         line: usize,
         column: Option<usize>,
     ) -> Result<(), String> {
-        let tkn = Token::from_string(token_string);
+        let tkn = StarToken::from_string(token_string);
         match tkn {
             Ok(token) => {
-                self.push(PositionedToken {
+                self.push(StarPositionedToken {
                     token,
-                    position: Position::new(file_id, line, column),
+                    position: StarPosition::new(file_id, line, column),
                 });
                 Ok(())
             }
@@ -54,10 +54,10 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
         &self,
         start_index: usize,
         identifier_line: usize,
-    ) -> Result<(Vec<PositionedToken>, usize), (String, Position)> {
+    ) -> Result<(Vec<StarPositionedToken>, usize), (String, StarPosition)> {
         // This function reads a sequence of tokens that defines a define processor
         // Backslash ables to continue reading the sequence in the next line
-        let mut sequence: Vec<PositionedToken> = Vec::new();
+        let mut sequence: Vec<StarPositionedToken> = Vec::new();
         let mut ptokens_read: usize = 0;
         let mut line_to_read: usize = identifier_line;
         let mut index = start_index;
@@ -78,7 +78,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
             }
 
             match ptk.token.clone() {
-                Token::Backslash => {
+                StarToken::Backslash => {
                     // If the token is a backslash, we continue reading in the next line
                     line_to_read += 1;
                     ptokens_read += 1;
@@ -100,9 +100,9 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
     fn scan_macro_definition_head(
         &self,
         vector_offset: usize,
-        identifier_position: Position,
-    ) -> Result<(Vec<PositionedToken>, usize), (String, Position)> {
-        let mut head: Vec<PositionedToken> = Vec::new();
+        identifier_position: StarPosition,
+    ) -> Result<(Vec<StarPositionedToken>, usize), (String, StarPosition)> {
+        let mut head: Vec<StarPositionedToken> = Vec::new();
         let mut ptkns_found_quantity = 0;
 
         let mut is_parenthesis_head = false;
@@ -119,7 +119,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
             let is_last_token = ptoken_counter == self.len() - 1;
 
             match ptkn.token.clone() {
-                Token::LeftParenthesis => {
+                StarToken::LeftParenthesis => {
                     if !is_parenthesis_head {
                         is_parenthesis_head = true;
                         ptkns_found_quantity += 1;
@@ -131,7 +131,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                     }
                 }
 
-                Token::RightParenthesis => {
+                StarToken::RightParenthesis => {
                     if !is_parenthesis_head {
                         return Err((
                             "Unexpected right parenthesis in macro definition head".to_string(),
@@ -149,7 +149,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                     }
                 }
 
-                Token::Comma => {
+                StarToken::Comma => {
                     if is_parenthesis_head {
                         if head.is_empty() {
                             return Err((
@@ -172,7 +172,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                     }
                 }
 
-                Token::MacroArgIdentifier(_) => {
+                StarToken::MacroArgIdentifier(_) => {
                     if is_parenthesis_head {
                         if head.is_empty() && has_comma {
                             return Err((
@@ -182,10 +182,10 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                         }
 
                         for existing_ptkn in head.iter() {
-                            if let Token::MacroArgIdentifier(existing_arg_name) =
+                            if let StarToken::MacroArgIdentifier(existing_arg_name) =
                                 &existing_ptkn.token
                             {
-                                if let Token::MacroArgIdentifier(arg_name) = &ptkn.token {
+                                if let StarToken::MacroArgIdentifier(arg_name) = &ptkn.token {
                                     if existing_arg_name == arg_name {
                                         return Err((
                                             "Duplicate macro argument identifier detected"
@@ -216,7 +216,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                 }
             }
 
-            if is_last_token && !matches!(ptkn.token, Token::RightParenthesis) {
+            if is_last_token && !matches!(ptkn.token, StarToken::RightParenthesis) {
                 return Err((
                     "Unexpected end of macro definition head, expected right parenthesis".to_string(),
                     ptkn.position.clone(),
@@ -240,9 +240,9 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
     fn scan_macro_calling_head(
         &self,
         vector_offset: usize,
-        identifier_position: Position,
-    ) -> Result<(Vec<PositionedToken>, usize), (String, Position)> {
-        let mut head: Vec<PositionedToken> = Vec::new();
+        identifier_position: StarPosition,
+    ) -> Result<(Vec<StarPositionedToken>, usize), (String, StarPosition)> {
+        let mut head: Vec<StarPositionedToken> = Vec::new();
         let mut ptkns_found_quantity = 0;
 
         let mut is_parenthesis_head = false;
@@ -259,7 +259,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
             let is_last_token = ptoken_counter == self.len() - 1;
 
             match ptkn.token.clone() {
-                Token::LeftParenthesis => {
+                StarToken::LeftParenthesis => {
                     if !is_parenthesis_head {
                         is_parenthesis_head = true;
                         ptkns_found_quantity += 1;
@@ -271,7 +271,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                     }
                 }
 
-                Token::RightParenthesis => {
+                StarToken::RightParenthesis => {
                     if !is_parenthesis_head {
                         return Err((
                             "Unexpected right parenthesis in macro calling head".to_string(),
@@ -290,7 +290,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                     }
                 }
 
-                Token::Comma => {
+                StarToken::Comma => {
                     if is_parenthesis_head {
                         if head.is_empty() {
                             return Err((
@@ -333,7 +333,7 @@ impl PositionedTokensVectorable for Vec<PositionedToken> {
                 }
             }
 
-            if is_last_token && !matches!(ptkn.token, Token::RightParenthesis) {
+            if is_last_token && !matches!(ptkn.token, StarToken::RightParenthesis) {
                 return Err((
                     "Unexpected end of macro calling head, expected right parenthesis".to_string(),
                     ptkn.position.clone(),

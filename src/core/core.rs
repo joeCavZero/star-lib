@@ -3,23 +3,22 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use crate::math::u8_from_string;
-use crate::utils::*;
 use crate::core::*;
 use crate::generateable::*;
 use crate::resolveable::*;
 use crate::scannable::*;
 use crate::parseable::*;
 
-pub const DATA_MEMORY_SIZE: usize = 65536;
+
 
 pub struct Star {
     pub file_table: HashMap<usize, String>,
-    pub data_memory: [u8; DATA_MEMORY_SIZE],
-    pub instruction_memory: Vec<u8>,
-    pub position_memory: Vec<Position>,
-    pub registers: Registers,
+    pub data_memory: StarDataMemory,
+    pub instruction_memory: StarInstructionMemory,
+    pub position_memory: StarPositionMemory,
+    pub registers: StarRegisters,
 
-    pub interface: Option<Box<dyn Interface>>,
+    pub interface: Option<Box<dyn StarInterface>>,
 }
 
 impl Star {
@@ -33,12 +32,12 @@ impl Star {
             data_memory: data_memory,
             instruction_memory: Vec::new(),
             position_memory: Vec::new(),
-            registers: Registers::new(),
+            registers: StarRegisters::new(),
             interface: None,
         }
     }
 
-    pub fn load_from_assembly(&mut self, source: &String) -> Result<(SymbolTable, usize), (String, Option<Position>)> {
+    pub fn load_from_assembly(&mut self, source: &String) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {
         match self.scan(source) {
             Ok(ptokens) => {
                 match self.process_positioned_tokens_from_assembly(ptokens) {
@@ -50,7 +49,7 @@ impl Star {
         }
     }
 
-    pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(SymbolTable, usize), (String, Option<Position>)> {        
+    pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {        
         
         match self.scan_file(file_path) {
             Ok(ptokens) => {
@@ -63,7 +62,7 @@ impl Star {
         }
     }
 
-    fn process_positioned_tokens_from_assembly(&mut self, ptokens: Vec<PositionedToken>) ->Result<(SymbolTable, usize), (String, Position)> {
+    fn process_positioned_tokens_from_assembly(&mut self, ptokens: Vec<StarPositionedToken>) ->Result<(StarSymbolTable, usize), (String, StarPosition)> {
         match self.parse(&ptokens) {
             Ok(mut ast) => {
                 match self.resolve(&mut ast) {
@@ -83,7 +82,7 @@ impl Star {
     }
 
 
-    pub fn load_from_binary_file(&mut self, file_path: &str) -> Result<usize, (String, Option<Position>)> {
+    pub fn load_from_binary_file(&mut self, file_path: &str) -> Result<usize, (String, Option<StarPosition>)> {
         let file_path_string = file_path.to_string();
         let absolute_file_path: String = match fs::canonicalize(file_path_string.clone()) {
             Ok(path) => path.to_string_lossy().to_string(),
@@ -107,7 +106,7 @@ impl Star {
         return self.load_from_binary(&file_content);
     }
 
-    pub fn load_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<Position>)> {
+    pub fn load_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<StarPosition>)> {
         
         let id_option: Option<usize> = None;
         
@@ -159,7 +158,7 @@ impl Star {
                                     Err(_) => {
                                         return Err((
                                             "Invalid binary instruction".to_string(),
-                                            Some(Position::new(
+                                            Some(StarPosition::new(
                                                 id_option,
                                                 tkn_line,
                                                 Some(tkn_column),
@@ -169,7 +168,7 @@ impl Star {
                                 }
 
                                 if self.instruction_memory.len() % 2 == 0 {
-                                    self.position_memory.push(Position::new(
+                                    self.position_memory.push(StarPosition::new(
                                         id_option,
                                         tkn_line,
                                         if line_has_identation {
@@ -192,7 +191,7 @@ impl Star {
                                     Err(_) => {
                                         return Err((
                                             "Invalid binary data".to_string(),
-                                            Some(Position::new(
+                                            Some(StarPosition::new(
                                                 id_option,
                                                 tkn_line,
                                                 Some(tkn_column),
@@ -205,7 +204,7 @@ impl Star {
                             _ => {
                                 return Err((
                                     "Unknown section".to_string(),
-                                    Some(Position::new(id_option, tkn_line, Some(tkn_column))),
+                                    Some(StarPosition::new(id_option, tkn_line, Some(tkn_column))),
                                 ));
                             }
                         }
@@ -239,7 +238,7 @@ impl Star {
                         Err(_) => {
                             return Err((
                                 "Invalid binary instruction".to_string(),
-                                Some(Position::new(id_option, tkn_line, Some(tkn_column))),
+                                Some(StarPosition::new(id_option, tkn_line, Some(tkn_column))),
                             ))
                         }
                     };
@@ -247,7 +246,7 @@ impl Star {
                     self.instruction_memory.push(v);
 
                     if self.instruction_memory.len() % 2 == 0 {
-                        self.position_memory.push(Position::new(
+                        self.position_memory.push(StarPosition::new(
                             id_option,
                             tkn_line,
                             if line_has_identation {
@@ -268,7 +267,7 @@ impl Star {
                         Err(_) => {
                             return Err((
                                 "Invalid binary data".to_string(),
-                                Some(Position::new(id_option, tkn_line, Some(tkn_column))),
+                                Some(StarPosition::new(id_option, tkn_line, Some(tkn_column))),
                             ))
                         }
                     };
@@ -279,7 +278,7 @@ impl Star {
                 _ => {
                     return Err((
                         "Unknown section".to_string(),
-                        Some(Position::new(id_option, tkn_line, Some(tkn_column))),
+                        Some(StarPosition::new(id_option, tkn_line, Some(tkn_column))),
                     ));
                 }
             }
@@ -295,14 +294,14 @@ impl Star {
         Ok(data_memory_vector.len())
     }
 
-    pub fn save_binary(&self, file_path: &str, data_section_size: usize) -> Option<String> {
+    pub fn save_binary(&self, file_path: &str, data_section_size: usize) -> Result<(), String> {
         let mut file = match File::create(file_path.to_string()) {
             Ok(f) => f,
-            Err(_) => return Some("Failed to create binary file".to_string()),
+            Err(_) => return Err("Failed to create binary file".to_string()),
         };
 
         if file.write_all(".instr".as_bytes()).is_err() {
-            return Some("Failed to write on binary file".to_string());
+            return Err("Failed to write on binary file".to_string());
         }
 
         for (index, instr) in self.instruction_memory.iter().enumerate() {
@@ -312,27 +311,27 @@ impl Star {
             }
 
             if file.write_all(output.as_bytes()).is_err() {
-                return Some("Failed to write on binary file".to_string());
+                return Err("Failed to write on binary file".to_string());
             }
         }
 
         if file.write_all("\n.data".as_bytes()).is_err() {
-            return Some("Failed to write on binary file".to_string());
+            return Err("Failed to write on binary file".to_string());
         }
 
         for byte_index in 0..data_section_size {
             let byte = match self.data_memory.get(byte_index) {
                 Some(b) => *b,
-                None => return Some("Data memory out of bounds".to_string()),
+                None => return Err("Data memory out of bounds".to_string()),
             };
 
             let output = format!("\n{:08b} ", byte);
             if file.write_all(output.as_bytes()).is_err() {
-                return Some("Failed to write on binary file".to_string());
+                return Err("Failed to write on binary file".to_string());
             }
         }
 
-        None
+        Ok(())
     }
     
     pub fn get_file_id_by_path(&self, file_path: &String) -> Option<usize> {
@@ -346,15 +345,15 @@ impl Star {
         }
     }
 
-    pub fn set_interface(&mut self, interface: Box<dyn Interface>) {
+    pub fn set_interface(&mut self, interface: Box<dyn StarInterface>) {
         self.interface = Some(interface);
     }
 
-    pub fn take_interface(&mut self) -> Option<Box<dyn Interface>> {
+    pub fn take_interface(&mut self) -> Option<Box<dyn StarInterface>> {
         self.interface.take()
     }
 
-    pub fn take_interface_mut(&mut self) -> Option<&mut Box<dyn Interface>> {
+    pub fn take_interface_mut(&mut self) -> Option<&mut Box<dyn StarInterface>> {
         self.interface.as_mut().take()
     }
 }

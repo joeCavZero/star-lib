@@ -4,24 +4,23 @@ use crate::core::*;
 use crate::math::*;
 use crate::parseable::*;
 use crate::symbolable::*;
-use crate::utils::*;
 
-pub type SymbolTable = HashMap<String, u16>;
+pub type StarSymbolTable = HashMap<String, u16>;
 
-pub trait Resolveable {
-    fn resolve(&self, ast: &mut Ast) -> Result<SymbolTable, (String, Position)>;
+pub trait StarResolveable {
+    fn resolve(&self, ast: &mut Ast) -> Result<StarSymbolTable, (String, StarPosition)>;
 
     fn resolve_space(&self, ast: &mut Ast);
 
     fn resolve_pseudo_instructions(
         &self,
         ast: &mut Ast,
-        symbol_table: &SymbolTable,
-    ) -> Option<(String, Position)>;
+        symbol_table: &StarSymbolTable,
+    ) -> Option<(String, StarPosition)>;
 }
 
-impl Resolveable for Star {
-    fn resolve(&self, ast: &mut Ast) -> Result<SymbolTable, (String, Position)> {
+impl StarResolveable for Star {
+    fn resolve(&self, ast: &mut Ast) -> Result<StarSymbolTable, (String, StarPosition)> {
         self.resolve_space(ast);
         match self.get_symbol_table(ast) {
             Ok(symbol_table) => {
@@ -33,7 +32,7 @@ impl Resolveable for Star {
             Err(e) => return Err(e),
         }
         /*
-        let symbol_table: SymbolTable = self.get_symbol_table(ast);
+        let symbol_table: StarSymbolTable = self.get_symbol_table(ast);
 
         if let Some(err) = self.resolve_pseudo_instructions(ast, &symbol_table) {
             return Err(err);
@@ -53,80 +52,80 @@ impl Resolveable for Star {
                 None => break,
             };
 
-            let zero_reg = PositionedToken {
-                token: Token::GeneralRegister(GeneralRegister::Zero),
+            let zero_reg = StarPositionedToken {
+                token: StarToken::StarGeneralRegister(StarGeneralRegister::Zero),
                 position: instr_camp.instruction.position,
             };
 
             let nope_camp = InstrCamp {
                 label_declarations: Vec::new(),
-                instruction: PositionedToken {
-                    token: Token::Instruction(Instruction::Add),
+                instruction: StarPositionedToken {
+                    token: StarToken::StarInstruction(StarInstruction::Add),
                     position: instr_camp.instruction.position,
                 },
-                sequence: Sequence::Three(zero_reg.clone(), zero_reg.clone(), zero_reg.clone()),
+                sequence: StarSequence::Three(zero_reg.clone(), zero_reg.clone(), zero_reg.clone()),
             };
 
             match instr_camp.instruction.token.clone() {
-                Token::PseudoInstruction(pseudo_instruction) => {
+                StarToken::StarPseudoInstruction(pseudo_instruction) => {
                     match pseudo_instruction {
                         // ==== +0 ====
-                        PseudoInstruction::Nope
-                        | PseudoInstruction::Move
-                        | PseudoInstruction::Jr
-                        | PseudoInstruction::Ret => {}
+                        StarPseudoInstruction::Nope
+                        | StarPseudoInstruction::Move
+                        | StarPseudoInstruction::Jr
+                        | StarPseudoInstruction::Ret => {}
 
                         // ==== +1 ====
-                        PseudoInstruction::Li
-                        | PseudoInstruction::La
-                        | PseudoInstruction::Mul
-                        | PseudoInstruction::Div
-                        | PseudoInstruction::Mod => {
+                        StarPseudoInstruction::Li
+                        | StarPseudoInstruction::La
+                        | StarPseudoInstruction::Mul
+                        | StarPseudoInstruction::Div
+                        | StarPseudoInstruction::Mod => {
                             ast.instr_field.insert(instr_counter + 1, nope_camp.clone());
                         }
 
                         // ==== +2 ====
-                        PseudoInstruction::Swap
-                        | PseudoInstruction::Addi
-                        | PseudoInstruction::Subi
-                        | PseudoInstruction::Andi
-                        | PseudoInstruction::Ori
-                        | PseudoInstruction::Xori
-                        | PseudoInstruction::Shli
-                        | PseudoInstruction::Shri
-                        | PseudoInstruction::Beqa
-                        | PseudoInstruction::Bneqa
-                        | PseudoInstruction::Blta
-                        | PseudoInstruction::Bgta
-                        | PseudoInstruction::Bltua
-                        | PseudoInstruction::Bgtua
-                        | PseudoInstruction::Inc
-                        | PseudoInstruction::Dec
-                        | PseudoInstruction::Ja => {
+                        StarPseudoInstruction::Swap
+                        | StarPseudoInstruction::Addi
+                        | StarPseudoInstruction::Subi
+                        | StarPseudoInstruction::Andi
+                        | StarPseudoInstruction::Ori
+                        | StarPseudoInstruction::Xori
+                        | StarPseudoInstruction::Shli
+                        | StarPseudoInstruction::Shri
+                        | StarPseudoInstruction::Beqa
+                        | StarPseudoInstruction::Bneqa
+                        | StarPseudoInstruction::Blta
+                        | StarPseudoInstruction::Bgta
+                        | StarPseudoInstruction::Bltua
+                        | StarPseudoInstruction::Bgtua
+                        | StarPseudoInstruction::Inc
+                        | StarPseudoInstruction::Dec
+                        | StarPseudoInstruction::Ja => {
                             for _ in 0..2 {
                                 ast.instr_field.insert(instr_counter + 1, nope_camp.clone());
                             }
                         }
 
                         // ==== +3 ====
-                        PseudoInstruction::Sb
-                        | PseudoInstruction::Muli
-                        | PseudoInstruction::Divi
-                        | PseudoInstruction::Modi => {
+                        StarPseudoInstruction::Sb
+                        | StarPseudoInstruction::Muli
+                        | StarPseudoInstruction::Divi
+                        | StarPseudoInstruction::Modi => {
                             for _ in 0..3 {
                                 ast.instr_field.insert(instr_counter + 1, nope_camp.clone());
                             }
                         }
 
                         // ==== +4 ====
-                        PseudoInstruction::Lb => {
+                        StarPseudoInstruction::Lb => {
                             for _ in 0..4 {
                                 ast.instr_field.insert(instr_counter + 1, nope_camp.clone());
                             }
                         }
 
                         // ==== +7 ====
-                        PseudoInstruction::Lw | PseudoInstruction::Sw => {
+                        StarPseudoInstruction::Lw | StarPseudoInstruction::Sw => {
                             for _ in 0..7 {
                                 ast.instr_field.insert(instr_counter + 1, nope_camp.clone());
                             }
@@ -149,8 +148,8 @@ impl Resolveable for Star {
     fn resolve_pseudo_instructions(
         &self,
         ast: &mut Ast,
-        symbol_table: &SymbolTable,
-    ) -> Option<(String, Position)> {
+        symbol_table: &StarSymbolTable,
+    ) -> Option<(String, StarPosition)> {
         let mut instr_counter: usize = 0;
 
         while instr_counter < ast.instr_field.len() {
@@ -159,36 +158,36 @@ impl Resolveable for Star {
                 None => break,
             };
 
-            let zero_reg = PositionedToken {
-                token: Token::GeneralRegister(GeneralRegister::Zero),
+            let zero_reg = StarPositionedToken {
+                token: StarToken::StarGeneralRegister(StarGeneralRegister::Zero),
                 position: instr_camp.instruction.position,
             };
-            let low_reg = PositionedToken {
-                token: Token::GeneralRegister(GeneralRegister::Low),
+            let low_reg = StarPositionedToken {
+                token: StarToken::StarGeneralRegister(StarGeneralRegister::Low),
                 position: instr_camp.instruction.position,
             };
-            let high_reg = PositionedToken {
-                token: Token::GeneralRegister(GeneralRegister::High),
+            let high_reg = StarPositionedToken {
+                token: StarToken::StarGeneralRegister(StarGeneralRegister::High),
                 position: instr_camp.instruction.position,
             };
 
-            let aux1_reg = PositionedToken {
-                token: Token::GeneralRegister(GeneralRegister::Aux1),
+            let aux1_reg = StarPositionedToken {
+                token: StarToken::StarGeneralRegister(StarGeneralRegister::Aux1),
                 position: instr_camp.instruction.position,
             };
-            let aux2_reg = PositionedToken {
-                token: Token::GeneralRegister(GeneralRegister::Aux2),
+            let aux2_reg = StarPositionedToken {
+                token: StarToken::StarGeneralRegister(StarGeneralRegister::Aux2),
                 position: instr_camp.instruction.position,
             };
 
             match instr_camp.instruction.token.clone() {
-                Token::PseudoInstruction(pseudo_instruction) => {
+                StarToken::StarPseudoInstruction(pseudo_instruction) => {
                     match pseudo_instruction {
                         // >>>> 1 <<<<
                         // ==== NOPE ====
-                        PseudoInstruction::Nope => {
-                            instr_camp.instruction.token = Token::Instruction(Instruction::Add);
-                            instr_camp.sequence = Sequence::Three(
+                        StarPseudoInstruction::Nope => {
+                            instr_camp.instruction.token = StarToken::StarInstruction(StarInstruction::Add);
+                            instr_camp.sequence = StarSequence::Three(
                                 zero_reg.clone(),
                                 zero_reg.clone(),
                                 zero_reg.clone(),
@@ -196,10 +195,10 @@ impl Resolveable for Star {
                         }
 
                         // ==== MOVE ====
-                        PseudoInstruction::Move => {
-                            instr_camp.instruction.token = Token::Instruction(Instruction::Add);
-                            if let Sequence::Two(arg1, arg2) = instr_camp.sequence.clone() {
-                                instr_camp.sequence = Sequence::Three(
+                        StarPseudoInstruction::Move => {
+                            instr_camp.instruction.token = StarToken::StarInstruction(StarInstruction::Add);
+                            if let StarSequence::Two(arg1, arg2) = instr_camp.sequence.clone() {
+                                instr_camp.sequence = StarSequence::Three(
                                     arg1.clone(),
                                     zero_reg.clone(),
                                     arg2.clone(),
@@ -210,10 +209,10 @@ impl Resolveable for Star {
                         }
 
                         // ==== JUMP RELATIVE ====
-                        PseudoInstruction::Jr => {
-                            instr_camp.instruction.token = Token::Instruction(Instruction::Beqr);
-                            if let Sequence::One(arg) = instr_camp.sequence.clone() {
-                                instr_camp.sequence = Sequence::Three(
+                        StarPseudoInstruction::Jr => {
+                            instr_camp.instruction.token = StarToken::StarInstruction(StarInstruction::Beqr);
+                            if let StarSequence::One(arg) = instr_camp.sequence.clone() {
+                                instr_camp.sequence = StarSequence::Three(
                                     zero_reg.clone(),
                                     zero_reg.clone(),
                                     arg.clone(),
@@ -224,19 +223,19 @@ impl Resolveable for Star {
                         }
 
                         // ==== RETURN ====
-                        PseudoInstruction::Ret => {
-                            instr_camp.instruction.token = Token::Instruction(Instruction::J);
-                            instr_camp.sequence = Sequence::One(PositionedToken {
-                                token: Token::GeneralRegister(GeneralRegister::ReturnAddress),
+                        StarPseudoInstruction::Ret => {
+                            instr_camp.instruction.token = StarToken::StarInstruction(StarInstruction::J);
+                            instr_camp.sequence = StarSequence::One(StarPositionedToken {
+                                token: StarToken::StarGeneralRegister(StarGeneralRegister::ReturnAddress),
                                 position: instr_camp.instruction.position.clone(),
                             });
                         }
 
                         // >>>> 2 <<<<
                         // ==== LOAD IMMEDIATE ====
-                        PseudoInstruction::Li => {
-                            if let Sequence::Two(reg_ptk, imm_ptk) = instr_camp.sequence.clone() {
-                                if let Token::NumberLiteral(imm_string) = imm_ptk.token.clone() {
+                        StarPseudoInstruction::Li => {
+                            if let StarSequence::Two(reg_ptk, imm_ptk) = instr_camp.sequence.clone() {
+                                if let StarToken::NumberLiteral(imm_string) = imm_ptk.token.clone() {
                                     let num = match u16_from_string(imm_string) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -248,14 +247,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             reg_ptk.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_low),
                                                 position: imm_ptk.position.clone(),
                                             },
                                         ),
@@ -263,14 +262,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             reg_ptk.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_high),
                                                 position: imm_ptk.position.clone(),
                                             },
                                         ),
@@ -285,10 +284,10 @@ impl Resolveable for Star {
                         }
 
                         // ==== LOAD ADDRESS ====
-                        PseudoInstruction::La => {
-                            if let Sequence::Two(reg_ptk, address_ptk) = instr_camp.sequence.clone()
+                        StarPseudoInstruction::La => {
+                            if let StarSequence::Two(reg_ptk, address_ptk) = instr_camp.sequence.clone()
                             {
-                                if let Token::Identifier(address_string) =
+                                if let StarToken::Identifier(address_string) =
                                     address_ptk.token.clone()
                                 {
                                     let num = match symbol_table.get(&address_string) {
@@ -305,14 +304,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             reg_ptk.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_low),
                                                 position: address_ptk.position.clone(),
                                             },
                                         ),
@@ -320,14 +319,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             reg_ptk.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_high),
                                                 position: address_ptk.position.clone(),
                                             },
                                         ),
@@ -342,24 +341,24 @@ impl Resolveable for Star {
                         }
 
                         // ==== MULTIPLY ====
-                        PseudoInstruction::Mul => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Mul => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
                                 let new_camp_1 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Mulhl),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Mulhl),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Two(arg2.clone(), arg3.clone()),
+                                    sequence: StarSequence::Two(arg2.clone(), arg3.clone()),
                                 };
 
                                 let new_camp_2 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Add),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Add),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         arg1.clone(),
                                         zero_reg.clone(),
                                         low_reg.clone(),
@@ -374,24 +373,24 @@ impl Resolveable for Star {
                         }
 
                         // ==== DIVIDE ====
-                        PseudoInstruction::Div => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Div => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
                                 let new_camp_1 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Divhl),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Divhl),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Two(arg2.clone(), arg3.clone()),
+                                    sequence: StarSequence::Two(arg2.clone(), arg3.clone()),
                                 };
 
                                 let new_camp_2 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Add),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Add),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         arg1.clone(),
                                         zero_reg.clone(),
                                         low_reg.clone(),
@@ -406,24 +405,24 @@ impl Resolveable for Star {
                         }
 
                         // ==== MODULO ====
-                        PseudoInstruction::Mod => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Mod => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
                                 let new_camp_1 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Divhl),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Divhl),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Two(arg2.clone(), arg3.clone()),
+                                    sequence: StarSequence::Two(arg2.clone(), arg3.clone()),
                                 };
 
                                 let new_camp_2 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Add),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Add),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         arg1.clone(),
                                         zero_reg.clone(),
                                         high_reg.clone(),
@@ -439,15 +438,15 @@ impl Resolveable for Star {
 
                         // >>>> 3 <<<<
                         // ==== SWAP ====
-                        PseudoInstruction::Swap => {
-                            if let Sequence::Two(arg1, arg2) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Swap => {
+                            if let StarSequence::Two(arg1, arg2) = instr_camp.sequence.clone() {
                                 let new_camp_1 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Add),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Add),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         aux1_reg.clone(),
                                         zero_reg.clone(),
                                         arg1.clone(),
@@ -456,11 +455,11 @@ impl Resolveable for Star {
 
                                 let new_camp_2 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Add),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Add),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         arg1.clone(),
                                         zero_reg.clone(),
                                         arg2.clone(),
@@ -469,11 +468,11 @@ impl Resolveable for Star {
 
                                 let new_camp_3 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Add),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Add),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         arg2.clone(),
                                         zero_reg.clone(),
                                         aux1_reg.clone(),
@@ -489,15 +488,15 @@ impl Resolveable for Star {
                         }
 
                         // ==== OPERATIONS IMMEDIATE ====
-                        PseudoInstruction::Addi
-                        | PseudoInstruction::Subi
-                        | PseudoInstruction::Andi
-                        | PseudoInstruction::Ori
-                        | PseudoInstruction::Xori
-                        | PseudoInstruction::Shli
-                        | PseudoInstruction::Shri => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
-                                if let Token::NumberLiteral(arg3_string) = arg3.token.clone() {
+                        StarPseudoInstruction::Addi
+                        | StarPseudoInstruction::Subi
+                        | StarPseudoInstruction::Andi
+                        | StarPseudoInstruction::Ori
+                        | StarPseudoInstruction::Xori
+                        | StarPseudoInstruction::Shli
+                        | StarPseudoInstruction::Shri => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                                if let StarToken::NumberLiteral(arg3_string) = arg3.token.clone() {
                                     let num = match u16_from_string(arg3_string) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -509,14 +508,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -524,51 +523,51 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
                                     };
 
                                     let operation = match instr_camp.instruction.token {
-                                        Token::PseudoInstruction(PseudoInstruction::Addi) => {
-                                            Instruction::Add
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Addi) => {
+                                            StarInstruction::Add
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Subi) => {
-                                            Instruction::Sub
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Subi) => {
+                                            StarInstruction::Sub
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Andi) => {
-                                            Instruction::And
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Andi) => {
+                                            StarInstruction::And
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Ori) => {
-                                            Instruction::Or
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Ori) => {
+                                            StarInstruction::Or
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Xori) => {
-                                            Instruction::Xor
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Xori) => {
+                                            StarInstruction::Xor
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Shli) => {
-                                            Instruction::Shl
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Shli) => {
+                                            StarInstruction::Shl
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Shri) => {
-                                            Instruction::Shr
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Shri) => {
+                                            StarInstruction::Shr
                                         }
                                         _ => unreachable!(),
                                     };
 
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(operation),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(operation),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             arg1.clone(),
                                             arg2.clone(),
                                             aux1_reg.clone(),
@@ -587,18 +586,18 @@ impl Resolveable for Star {
                         }
 
                         // ==== INC DEC ====
-                        PseudoInstruction::Inc | PseudoInstruction::Dec => {
-                            if let Sequence::One(arg) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Inc | StarPseudoInstruction::Dec => {
+                            if let StarSequence::One(arg) = instr_camp.sequence.clone() {
                                 let new_camp_1 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Lli),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Lli),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Two(
+                                    sequence: StarSequence::Two(
                                         aux1_reg.clone(),
-                                        PositionedToken {
-                                            token: Token::NumberLiteral("0x01".to_string()),
+                                        StarPositionedToken {
+                                            token: StarToken::NumberLiteral("0x01".to_string()),
                                             position: arg.position.clone(),
                                         },
                                     ),
@@ -606,36 +605,36 @@ impl Resolveable for Star {
 
                                 let new_camp_2 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(Instruction::Lai),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(StarInstruction::Lai),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Two(
+                                    sequence: StarSequence::Two(
                                         aux1_reg.clone(),
-                                        PositionedToken {
-                                            token: Token::NumberLiteral("0x00".to_string()),
+                                        StarPositionedToken {
+                                            token: StarToken::NumberLiteral("0x00".to_string()),
                                             position: arg.position.clone(),
                                         },
                                     ),
                                 };
 
                                 let op = match instr_camp.instruction.token {
-                                    Token::PseudoInstruction(PseudoInstruction::Inc) => {
-                                        Instruction::Add
+                                    StarToken::StarPseudoInstruction(StarPseudoInstruction::Inc) => {
+                                        StarInstruction::Add
                                     }
-                                    Token::PseudoInstruction(PseudoInstruction::Dec) => {
-                                        Instruction::Sub
+                                    StarToken::StarPseudoInstruction(StarPseudoInstruction::Dec) => {
+                                        StarInstruction::Sub
                                     }
                                     _ => unreachable!(),
                                 };
 
                                 let new_camp_3 = InstrCamp {
                                     label_declarations: Vec::new(),
-                                    instruction: PositionedToken {
-                                        token: Token::Instruction(op),
+                                    instruction: StarPositionedToken {
+                                        token: StarToken::StarInstruction(op),
                                         position: instr_camp.instruction.position.clone(),
                                     },
-                                    sequence: Sequence::Three(
+                                    sequence: StarSequence::Three(
                                         arg.clone(),
                                         arg.clone(),
                                         aux1_reg.clone(),
@@ -651,9 +650,9 @@ impl Resolveable for Star {
                         }
 
                         // ==== JUMP ABSOLUTE ====
-                        PseudoInstruction::Ja => {
-                            if let Sequence::One(arg) = instr_camp.sequence.clone() {
-                                if let Token::Identifier(label) = arg.token.clone() {
+                        StarPseudoInstruction::Ja => {
+                            if let StarSequence::One(arg) = instr_camp.sequence.clone() {
+                                if let StarToken::Identifier(label) = arg.token.clone() {
                                     let address = match symbol_table.get(&label) {
                                         Some(addr) => *addr,
                                         None => {
@@ -668,14 +667,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(address_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(address_low),
                                                 position: arg.position.clone(),
                                             },
                                         ),
@@ -683,14 +682,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(address_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(address_high),
                                                 position: arg.position.clone(),
                                             },
                                         ),
@@ -698,11 +697,11 @@ impl Resolveable for Star {
 
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::J),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::J),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::One(aux1_reg.clone()),
+                                        sequence: StarSequence::One(aux1_reg.clone()),
                                     };
 
                                     ast.instr_field[instr_counter] = new_camp_1;
@@ -718,10 +717,10 @@ impl Resolveable for Star {
 
                         // >>>> 6 <<<<
                         // ==== STORE BYTE ====
-                        PseudoInstruction::Sb => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Sb => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
                                 // sb $rd, $rs[offset]
-                                if let Token::NumberLiteral(offset_str) = arg3.token.clone() {
+                                if let StarToken::NumberLiteral(offset_str) = arg3.token.clone() {
                                     let offset = match u16_from_string(offset_str) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -733,14 +732,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(offset_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(offset_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -748,14 +747,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(offset_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(offset_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -764,11 +763,11 @@ impl Resolveable for Star {
                                     // add $aux1, $aux1, $rs
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             aux1_reg.clone(),
                                             aux1_reg.clone(),
                                             arg2.clone(),
@@ -778,11 +777,11 @@ impl Resolveable for Star {
                                     // slb $rd, $aux1
                                     let new_camp_4 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Slb),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Slb),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg1.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg1.clone(), aux1_reg.clone()),
                                     };
 
                                     ast.instr_field[instr_counter] = new_camp_1;
@@ -798,9 +797,9 @@ impl Resolveable for Star {
                         }
 
                         // ==== MULTIPLY IMMEDIATE ====
-                        PseudoInstruction::Muli => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
-                                if let Token::NumberLiteral(imm_str) = arg3.token.clone() {
+                        StarPseudoInstruction::Muli => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                                if let StarToken::NumberLiteral(imm_str) = arg3.token.clone() {
                                     let num = match u16_from_string(imm_str) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -812,14 +811,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -827,14 +826,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -842,20 +841,20 @@ impl Resolveable for Star {
 
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Mulhl),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Mulhl),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg2.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg2.clone(), aux1_reg.clone()),
                                     };
 
                                     let new_camp_4 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             arg1.clone(),
                                             zero_reg.clone(),
                                             low_reg.clone(),
@@ -875,9 +874,9 @@ impl Resolveable for Star {
                         }
 
                         // ==== DIVIDE IMMEDIATE ====
-                        PseudoInstruction::Divi => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
-                                if let Token::NumberLiteral(imm_str) = arg3.token.clone() {
+                        StarPseudoInstruction::Divi => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                                if let StarToken::NumberLiteral(imm_str) = arg3.token.clone() {
                                     let num = match u16_from_string(imm_str) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -889,14 +888,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -904,14 +903,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -919,20 +918,20 @@ impl Resolveable for Star {
 
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Divhl),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Divhl),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg2.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg2.clone(), aux1_reg.clone()),
                                     };
 
                                     let new_camp_4 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             arg1.clone(),
                                             zero_reg.clone(),
                                             low_reg.clone(),
@@ -952,9 +951,9 @@ impl Resolveable for Star {
                         }
 
                         // ==== MODULO IMMEDIATE ====
-                        PseudoInstruction::Modi => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
-                                if let Token::NumberLiteral(imm_str) = arg3.token.clone() {
+                        StarPseudoInstruction::Modi => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                                if let StarToken::NumberLiteral(imm_str) = arg3.token.clone() {
                                     let num = match u16_from_string(imm_str) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -966,14 +965,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -981,14 +980,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(num_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(num_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -996,20 +995,20 @@ impl Resolveable for Star {
 
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Divhl),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Divhl),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg2.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg2.clone(), aux1_reg.clone()),
                                     };
 
                                     let new_camp_4 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             arg1.clone(),
                                             zero_reg.clone(),
                                             high_reg.clone(),
@@ -1029,10 +1028,10 @@ impl Resolveable for Star {
                         }
 
                         // ==== LOAD BYTE (5 instructions) ====
-                        PseudoInstruction::Lb => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                        StarPseudoInstruction::Lb => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
                                 // lb $rd, $rs[offset]
-                                if let Token::NumberLiteral(offset_str) = arg3.token.clone() {
+                                if let StarToken::NumberLiteral(offset_str) = arg3.token.clone() {
                                     let offset = match u16_from_string(offset_str) {
                                         Ok(n) => n,
                                         Err(e) => {
@@ -1044,28 +1043,28 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(offset_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(offset_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
                                     };
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(offset_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(offset_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -1074,11 +1073,11 @@ impl Resolveable for Star {
                                     // add $aux1, $aux1, $rs
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             aux1_reg.clone(),
                                             aux1_reg.clone(),
                                             arg2.clone(),
@@ -1088,21 +1087,21 @@ impl Resolveable for Star {
                                     // llb $rd, $aux1
                                     let new_camp_4 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Llb),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Llb),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg1.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg1.clone(), aux1_reg.clone()),
                                     };
 
                                     // xlb $rd, $rd
                                     let new_camp_5 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Xlb),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Xlb),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg1.clone(), arg1.clone()),
+                                        sequence: StarSequence::Two(arg1.clone(), arg1.clone()),
                                     };
 
                                     ast.instr_field[instr_counter] = new_camp_1;
@@ -1119,14 +1118,14 @@ impl Resolveable for Star {
                         }
 
                         // ==== BRANCH INSTRUCTIONS (3 instructions)====
-                        PseudoInstruction::Beqa
-                        | PseudoInstruction::Bneqa
-                        | PseudoInstruction::Blta
-                        | PseudoInstruction::Bgta
-                        | PseudoInstruction::Bltua
-                        | PseudoInstruction::Bgtua => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
-                                if let Token::Identifier(label) = arg3.token.clone() {
+                        StarPseudoInstruction::Beqa
+                        | StarPseudoInstruction::Bneqa
+                        | StarPseudoInstruction::Blta
+                        | StarPseudoInstruction::Bgta
+                        | StarPseudoInstruction::Bltua
+                        | StarPseudoInstruction::Bgtua => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                                if let StarToken::Identifier(label) = arg3.token.clone() {
                                     let address = match symbol_table.get(&label) {
                                         Some(addr) => *addr,
                                         None => {
@@ -1146,14 +1145,14 @@ impl Resolveable for Star {
 
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(relative_target_address_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(relative_target_address_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -1161,48 +1160,48 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(relative_target_address_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(relative_target_address_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
                                     };
 
                                     let branch_instr = match instr_camp.instruction.token {
-                                        Token::PseudoInstruction(PseudoInstruction::Beqa) => {
-                                            Instruction::Beqr
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Beqa) => {
+                                            StarInstruction::Beqr
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Bneqa) => {
-                                            Instruction::Bneqr
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Bneqa) => {
+                                            StarInstruction::Bneqr
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Blta) => {
-                                            Instruction::Bltr
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Blta) => {
+                                            StarInstruction::Bltr
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Bgta) => {
-                                            Instruction::Bgtr
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Bgta) => {
+                                            StarInstruction::Bgtr
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Bltua) => {
-                                            Instruction::Bltur
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Bltua) => {
+                                            StarInstruction::Bltur
                                         }
-                                        Token::PseudoInstruction(PseudoInstruction::Bgtua) => {
-                                            Instruction::Bgtur
+                                        StarToken::StarPseudoInstruction(StarPseudoInstruction::Bgtua) => {
+                                            StarInstruction::Bgtur
                                         }
                                         _ => unreachable!(),
                                     };
 
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(branch_instr),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(branch_instr),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             arg1.clone(),
                                             arg2.clone(),
                                             aux1_reg.clone(),
@@ -1222,9 +1221,9 @@ impl Resolveable for Star {
 
                         // >>>> 10 <<<<
                         // ==== LOAD WORD and STORE WORD ====
-                        PseudoInstruction::Lw | PseudoInstruction::Sw => {
-                            if let Sequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
-                                if let Token::NumberLiteral(offset_str) = arg3.token.clone() {
+                        StarPseudoInstruction::Lw | StarPseudoInstruction::Sw => {
+                            if let StarSequence::Three(arg1, arg2, arg3) = instr_camp.sequence.clone() {
+                                if let StarToken::NumberLiteral(offset_str) = arg3.token.clone() {
                                     // lw $rd, $rs[offset]
                                     let offset = match u16_from_string(offset_str) {
                                         Ok(n) => n,
@@ -1238,14 +1237,14 @@ impl Resolveable for Star {
                                     // la $aux1, offset
                                     let new_camp_1 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(offset_low),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(offset_low),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -1253,14 +1252,14 @@ impl Resolveable for Star {
 
                                     let new_camp_2 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux1_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral(offset_high),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral(offset_high),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -1269,11 +1268,11 @@ impl Resolveable for Star {
                                     // add $aux1, $aux1, $rs
                                     let new_camp_3 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             aux1_reg.clone(),
                                             aux1_reg.clone(),
                                             arg2.clone(),
@@ -1283,32 +1282,32 @@ impl Resolveable for Star {
                                     // lab $rd, $aux1 or sab $rd, $aux1
                                     let new_camp_4 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(match instr_camp.instruction.token {
-                                                Token::PseudoInstruction(PseudoInstruction::Lw) => {
-                                                    Instruction::Lab
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(match instr_camp.instruction.token {
+                                                StarToken::StarPseudoInstruction(StarPseudoInstruction::Lw) => {
+                                                    StarInstruction::Lab
                                                 }
-                                                Token::PseudoInstruction(PseudoInstruction::Sw) => {
-                                                    Instruction::Sab
+                                                StarToken::StarPseudoInstruction(StarPseudoInstruction::Sw) => {
+                                                    StarInstruction::Sab
                                                 }
                                                 _ => unreachable!(),
                                             }),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg1.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg1.clone(), aux1_reg.clone()),
                                     };
 
                                     // la $aux2, 0x0001
                                     let new_camp_5 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lli),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lli),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux2_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral("0x01".to_string()),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral("0x01".to_string()),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -1316,14 +1315,14 @@ impl Resolveable for Star {
 
                                     let new_camp_6 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Lai),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Lai),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(
+                                        sequence: StarSequence::Two(
                                             aux2_reg.clone(),
-                                            PositionedToken {
-                                                token: Token::NumberLiteral("0x00".to_string()),
+                                            StarPositionedToken {
+                                                token: StarToken::NumberLiteral("0x00".to_string()),
                                                 position: arg3.position.clone(),
                                             },
                                         ),
@@ -1332,11 +1331,11 @@ impl Resolveable for Star {
                                     // add $aux1, $aux1, $aux2
                                     let new_camp_7 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(Instruction::Add),
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(StarInstruction::Add),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Three(
+                                        sequence: StarSequence::Three(
                                             aux1_reg.clone(),
                                             aux1_reg.clone(),
                                             aux2_reg.clone(),
@@ -1346,19 +1345,19 @@ impl Resolveable for Star {
                                     // llb $rd, $aux1 or slb $rd, $aux1
                                     let new_camp_8 = InstrCamp {
                                         label_declarations: Vec::new(),
-                                        instruction: PositionedToken {
-                                            token: Token::Instruction(match instr_camp.instruction.token {
-                                                Token::PseudoInstruction(PseudoInstruction::Lw) => {
-                                                    Instruction::Llb
+                                        instruction: StarPositionedToken {
+                                            token: StarToken::StarInstruction(match instr_camp.instruction.token {
+                                                StarToken::StarPseudoInstruction(StarPseudoInstruction::Lw) => {
+                                                    StarInstruction::Llb
                                                 }
-                                                Token::PseudoInstruction(PseudoInstruction::Sw) => {
-                                                    Instruction::Slb
+                                                StarToken::StarPseudoInstruction(StarPseudoInstruction::Sw) => {
+                                                    StarInstruction::Slb
                                                 }
                                                 _ => unreachable!(),
                                             }),
                                             position: instr_camp.instruction.position.clone(),
                                         },
-                                        sequence: Sequence::Two(arg1.clone(), aux1_reg.clone()),
+                                        sequence: StarSequence::Two(arg1.clone(), aux1_reg.clone()),
                                     };
 
                                     ast.instr_field[instr_counter] = new_camp_1;

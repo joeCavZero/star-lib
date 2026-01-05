@@ -1,9 +1,9 @@
-use crate::utils::*;
+use crate::core::*;
 
 #[derive(Debug, Clone)]
-pub enum Sequence {
+pub enum StarSequence {
     Zero,
-    One(PositionedToken),
-    Two(PositionedToken, PositionedToken),
-    Three(PositionedToken, PositionedToken, PositionedToken),
+    One(StarPositionedToken),
+    Two(StarPositionedToken, StarPositionedToken),
+    Three(StarPositionedToken, StarPositionedToken, StarPositionedToken),
 }

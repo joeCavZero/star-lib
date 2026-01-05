@@ -1,5 +1,5 @@
-use crate::core::Star;
+use crate::core::StarMcallContext;
 
-pub trait Interface {
-    fn mcall(&mut self, s: &mut Star) -> bool;
+pub trait StarInterface {
+    fn mcall(&mut self, s: &mut dyn StarMcallContext) -> bool;
 }
