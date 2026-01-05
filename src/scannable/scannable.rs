@@ -5,7 +5,7 @@ use crate::core::*;
 use crate::utils::*;
 use crate::scannable::positioned_tokens_vectorable::*;
 
-type MacroTable = HashMap<String, (Vec<StarPositionedToken>, Vec<StarPositionedToken>)>;
+type StarMacroTable = HashMap<String, (Vec<StarPositionedToken>, Vec<StarPositionedToken>)>;
 
 pub trait StarScannable {
     fn scan_file(&mut self, base_file_path: &str)
@@ -20,7 +20,7 @@ pub trait StarScannable {
         file_path_to_include: &String,
         file_counter: &mut usize,
         file_dependency_table: &mut HashMap<usize, HashSet<usize>>,
-        macro_table: &mut MacroTable,
+        macro_table: &mut StarMacroTable,
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
@@ -33,7 +33,7 @@ pub trait StarScannable {
         ptokens: &mut Vec<StarPositionedToken>,
         file_counter: &mut usize,
         file_dependency_table: &mut HashMap<usize, HashSet<usize>>,
-        macro_table: &mut MacroTable,
+        macro_table: &mut StarMacroTable,
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
@@ -48,7 +48,7 @@ impl StarScannable for Star {
         let base_file_path_string = base_file_path.to_string();
 
         let mut file_dependency_table: HashMap<usize, HashSet<usize>> = HashMap::new();
-        let mut macro_table: MacroTable = HashMap::new();
+        let mut macro_table: StarMacroTable = HashMap::new();
         let mut once_set: HashSet<String> = HashSet::new();
         let mut file_counter: usize = 0;
         let mut processing_stack: HashSet<usize> = HashSet::new();
@@ -69,7 +69,7 @@ impl StarScannable for Star {
         -> Result<Vec<StarPositionedToken>, (String, Option<StarPosition>)>
     {
         let mut file_dependency_table: HashMap<usize, HashSet<usize>> = HashMap::new();
-        let mut macro_table: MacroTable = HashMap::new();
+        let mut macro_table: StarMacroTable = HashMap::new();
         let mut once_set: HashSet<String> = HashSet::new();
         let mut file_counter: usize = 0;
         let mut processing_stack: HashSet<usize> = HashSet::new();
@@ -112,7 +112,7 @@ impl StarScannable for Star {
         file_path_to_include: &String,
         file_counter: &mut usize,
         file_dependency_table: &mut HashMap<usize, HashSet<usize>>,
-        macro_table: &mut MacroTable,
+        macro_table: &mut StarMacroTable,
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,
@@ -198,7 +198,7 @@ impl StarScannable for Star {
         ptokens: &mut Vec<StarPositionedToken>,
         file_counter: &mut usize,
         file_dependency_table: &mut HashMap<usize, HashSet<usize>>,
-        macro_table: &mut MacroTable,
+        macro_table: &mut StarMacroTable,
         once_set: &mut HashSet<String>,
         processing_stack: &mut HashSet<usize>,
         file_mode: bool,

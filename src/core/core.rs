@@ -34,12 +34,28 @@ impl Star {
             data_memory: data_memory,
             instruction_memory: Vec::new(),
             position_memory: Vec::new(),
-            registers: StarRegisters::new(),
+            registers: StarRegisters::new_randomized(),
             interface: None,
         }
     }
 
+    pub fn reset(&mut self) {
+        
+        let mut new_data_memory = [0; DATA_MEMORY_SIZE];
+        for b in new_data_memory.iter_mut() {
+            *b = rand::random::<u8>();
+        }
+
+        self.data_memory = new_data_memory;
+        self.instruction_memory.clear();
+        self.file_table.clear();
+        self.position_memory.clear();
+        self.registers = StarRegisters::new_randomized();
+        
+    }
+
     pub fn load_from_assembly(&mut self, source: &String) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {
+        self.reset();
         match self.scan(source) {
             Ok(ptokens) => {
                 match self.process_positioned_tokens_from_assembly(ptokens) {
@@ -52,7 +68,7 @@ impl Star {
     }
 
     pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {        
-        
+        self.reset();
         match self.scan_file(file_path) {
             Ok(ptokens) => {
                 match self.process_positioned_tokens_from_assembly(ptokens) {
@@ -83,8 +99,9 @@ impl Star {
         }
     }
 
-
     pub fn load_from_binary_file(&mut self, file_path: &str) -> Result<usize, (String, Option<StarPosition>)> {
+        self.reset();
+
         let file_path_string = file_path.to_string();
         let absolute_file_path: String = match fs::canonicalize(file_path_string.clone()) {
             Ok(path) => path.to_string_lossy().to_string(),
@@ -109,7 +126,8 @@ impl Star {
     }
 
     pub fn load_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<StarPosition>)> {
-        
+        self.reset();
+
         let id_option: Option<usize> = None;
         
         let mut section = ".instr".to_string();
@@ -296,7 +314,7 @@ impl Star {
         Ok(data_memory_vector.len())
     }
 
-    pub fn save_binary(&self, file_path: &str, data_section_size: usize) -> Result<(), String> {
+    pub fn save_loaded_binary(&self, file_path: &str, data_section_size: usize) -> Result<(), String> {
         let mut file = match File::create(file_path.to_string()) {
             Ok(f) => f,
             Err(_) => return Err("Failed to create binary file".to_string()),
@@ -358,11 +376,11 @@ impl Star {
     pub fn take_interface_mut(&mut self) -> Option<&mut Box<dyn StarInterface>> {
         self.interface.as_mut().take()
     }
-    pub fn execute(&mut self) -> Option<(String, Option<StarPosition>)> {
+    pub fn execute(&mut self) -> Result<(), (String, Option<StarPosition>)> {
         let instruction_memory_len = match u16::try_from(self.instruction_memory.len()) {
             Ok(len) => len,
             Err(_) => {
-                return Some(("StarInstruction memory length exceeds maximum size of 16 bits".to_string(), None))
+                return Err(("StarInstruction memory length exceeds maximum size of 16 bits".to_string(), None))
             }
         };
 
@@ -391,7 +409,7 @@ impl Star {
             */
             if self.registers.instruction_register == 0b_0000_0000_0000_0000 {
                 // NOP instruction, just increment the program counter
-                if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                if let Err(err) = self.registers.increment_program_counter() {return Err((err, instruction_position_option));}
                 
                 continue;
             }
@@ -409,7 +427,7 @@ impl Star {
                                     self.registers.set_general_register_value(reg1, res);
                                     self.registers.carry = if is_carry { 1 } else { 0 };
 
-                                    if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                                    if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                                 }
                                 StarInstruction::Sub => {
                                     let reg2_v = self.registers.get_general_register_value(reg2);
@@ -418,7 +436,7 @@ impl Star {
                                     self.registers.set_general_register_value(reg1, res);
                                     self.registers.carry = if is_carry { 0xFFFF } else { 0 };
 
-                                    if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                                    if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                                 }
 
                                 StarInstruction::And | StarInstruction::Or | StarInstruction::Xor => {
@@ -432,7 +450,7 @@ impl Star {
                                     };
                                     self.registers.set_general_register_value(reg1, res);
 
-                                    if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                                    if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                                 }
 
                                 StarInstruction::Shl | StarInstruction::Shr => {
@@ -447,7 +465,7 @@ impl Star {
                                     self.registers.set_general_register_value(reg1, res);
                                     self.registers.carry = carry;
 
-                                    if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                                    if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                                 }
 
                                 // ==== Branches ====
@@ -480,7 +498,7 @@ impl Star {
                                     if condition {
                                         match self.registers.program_counter.checked_add(1) {
                                             Some(ra) => self.registers.return_address = ra,
-                                            None => return Some((
+                                            None => return  Err((
                                                 "Return address overflow".to_string(),
                                                 instruction_position_option,
                                             )),
@@ -489,7 +507,7 @@ impl Star {
                                         self.registers.program_counter =
                                             self.registers.program_counter.wrapping_add(reg3_v);
                                     } else {
-                                        if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                                        if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                                     }
                                 }
 
@@ -497,7 +515,7 @@ impl Star {
                             }
                         }
 
-                        None => return Some((
+                        None => return  Err((
                             "Invalid instruction format for Trinity".to_string(),
                             instruction_position_option,
                         )),
@@ -514,7 +532,7 @@ impl Star {
 
                             self.registers.set_general_register_value(reg, new_value);
 
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return Err((err, instruction_position_option));}
                         }
                         StarInstruction::Lli => {
                             let reg_v = self.registers.get_general_register_value(reg);
@@ -524,11 +542,11 @@ impl Star {
 
                             self.registers.set_general_register_value(reg, new_value);
 
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
                         _ => unreachable!(),
                     },
-                    None => return Some((
+                    None => return  Err((
                         "Invalid instruction format for Hime".to_string(),
                         instruction_position_option,
                     )),
@@ -545,7 +563,7 @@ impl Star {
                             self.registers.high = high;
                             self.registers.low = low;
 
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Muluhl => {
@@ -557,7 +575,7 @@ impl Star {
                             self.registers.high = high;
                             self.registers.low = low;
 
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Divhl => {
@@ -575,7 +593,7 @@ impl Star {
                                 self.registers.high = i16::cast_unsigned(rem);
                                 self.registers.low = i16::cast_unsigned(res);
                             }
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Divuhl => {
@@ -591,13 +609,13 @@ impl Star {
                                 self.registers.high = rem;
                                 self.registers.low = res;
                             }
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Not => {
                             let reg2_v = self.registers.get_general_register_value(reg2);
                             self.registers.set_general_register_value(reg1, !reg2_v);
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Xlb => {
@@ -610,7 +628,7 @@ impl Star {
                             }
                             let res = unsafe { transmute::<(u8, u8), u16>((low, high)) };
                             self.registers.set_general_register_value(reg1, res);
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Lab | StarInstruction::Llb => {
@@ -632,12 +650,12 @@ impl Star {
 
                                     self.registers.set_general_register_value(reg1, v);
                                 }
-                                Err(e) => return Some((
+                                Err(e) => return  Err((
                                     e,
                                     instruction_position_option,
                                 )),
                             }
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         StarInstruction::Sab | StarInstruction::Slb => {
@@ -653,18 +671,18 @@ impl Star {
 
                             match self.data_memory.store(reg2_v, value) {
                                 Ok(_) => {}
-                                Err(e) => return Some((
+                                Err(e) => return  Err((
                                     e,
                                     instruction_position_option,
                                 )),
                             }
 
-                            if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));}
+                            if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));}
                         }
 
                         _ => unreachable!(),
                     },
-                    None => return Some((
+                    None => return  Err((
                         "Invalid instruction format for Pair".to_string(),
                         instruction_position_option,
                     )),
@@ -676,7 +694,7 @@ impl Star {
                             let reg_v = self.registers.get_general_register_value(reg);
                             match self.registers.program_counter.checked_add(1) {
                                 Some(ra) => self.registers.return_address = ra,
-                                None => return Some((
+                                None => return  Err((
                                     "Return address overflow".to_string(),
                                     instruction_position_option,
                                 )),
@@ -685,7 +703,7 @@ impl Star {
                         }
                         _ => unreachable!(),
                     },
-                    None => return Some((
+                    None => return  Err((
                         "Invalid instruction format for Clover".to_string(),
                         instruction_position_option,
                     )),
@@ -710,12 +728,12 @@ impl Star {
                                         break 'execution_loop;
                                     }
 
-                                    if let Err(err) = self.registers.increment_program_counter() {return Some((err, instruction_position_option));} 
+                                    if let Err(err) = self.registers.increment_program_counter() {return  Err((err, instruction_position_option));} 
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        None => return Some((
+                        None => return  Err((
                             "Invalid instruction format for Ark".to_string(),
                             instruction_position_option,
                         )),
@@ -724,6 +742,6 @@ impl Star {
             }
         }
         io::stdout().flush().unwrap();
-        return None;
+        return Ok(());
     }
 }

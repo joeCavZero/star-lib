@@ -28,7 +28,7 @@ pub struct StarRegisters {
 }
 
 impl StarRegisters {
-    pub fn new() -> Self {
+    pub fn new_randomized() -> Self {
         Self {
             zero: 0,
             a: rand::random::<u16>(),
