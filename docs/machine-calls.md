@@ -1,31 +1,114 @@
 # Machine Calls
 
-Machine calls are special instructions that allow a program to interact with the system and perform I/O operations. Each machine call is identified by a unique call number and can use up to three auxiliary registers as parameters:
+Machine calls are **special instructions** that allow a program running inside the virtual machine to **interact with the host system** and perform **operations outside the normal instruction set**.
 
-- **$aux1**: The first auxiliary register, used to specify the operation or provide additional parameters.
-- **$aux2**: The second auxiliary register, often used to hold data or addresses related to the operation.
-- **$aux3**: The third auxiliary register, used for additional data or addresses when necessary.
-    
-| call name               | $aux1 | $aux2           | $aux3          | description                                                                                                 |
-|:----------------------- |:-----:|:---------------:|:--------------:|:------------------------------------------------------------------------------------------------------------|
-| print unsigned byte     | 1     | number          | ~              | Prints the lower 8 bits of a 16-bit number as an unsigned byte.                                             |
-| print signed byte       | 2     | number          | ~              | Prints the lower 8 bits of a 16-bit number as a signed byte.                                                |
-| print unsigned word     | 3     | number          | ~              | Prints a 16-bit unsigned integer.                                                                           |
-| print signed word       | 4     | number          | ~              | Prints a 16-bit signed integer.                                                                             |
-| print unsigned double   | 5     | low             | high           | Prints a 32-bit unsigned integer, where `low` and `high` are the lower and upper 16 bits, respectively.     |
-| print signed double     | 6     | low             | high           | Prints a 32-bit signed integer, where `low` and `high` are the lower and upper 16 bits, respectively.       |
-| print char              | 7     | char            | ~              | Prints the lower 8 bits of $aux2 as a character.                                                            |
-| print string            | 8     | address         | length         | Prints a string from memory starting at `address` with the given `length` (does not stop at zero byte).     |
-| print string zero       | 9     | address         | ~              | Prints a string from memory starting at `address` until the first zero byte (`\0`).                         |
-| read byte               | 10    | ~               | ~              | Reads a byte (u8) from user input and stores it in $aux2 (lower 8 bits).                                    |
-| read word               | 11    | ~               | ~              | Reads a 16-bit unsigned integer from user input and stores it in $aux2.                                     |
-| read double             | 12    | ~               | ~              | Reads a 32-bit unsigned integer from user input and stores lower 16 bits in $aux2, upper 16 bits in $aux3.  |
-| read char               | 13    | ~               | ~              | Reads a single character from user input and stores its code in $aux2.                                      |
-| read string             | 14    | address         | max length     | Reads a string from user input, stores it at `address` (up to `max length`), and stores the length in $aux2.|
-| read string zero        | 15    | address         | max length     | Reads a string from user input, stores it at `address` (up to `max length`), always adds a zero byte at end.|
-| exit                    | 16    | ~               | ~              | Exits the program.                                                                                          |
-| print instruction       | 17    | pc              | ~              | Prints the 16-bit instruction at the given program counter (`pc`). Useful for debugging.                    |
-| sleep                   | 18    | millis          | ~              | Pauses execution for the given number of milliseconds.                                                      |
-| random                  | 19    | ~               | ~              | Generates a random number and stores it in $aux2.                                                           |
+They act as the primary bridge between the **guest program** and the **runtime environment**, enabling controlled access to features such as input/output, debugging, system services, and environment-dependent behavior.
 
-> For more information about the execution of machine calls, see the [execution stage documentation](/docs/execution-stage.md).
+## Purpose
+
+The instruction set of the virtual machine is intentionally minimal and deterministic.
+Machine calls exist to handle tasks that:
+
+* Cannot be expressed purely with standard instructions
+* Require interaction with the external environment
+* Depend on platform-specific or runtime-specific behavior
+
+Examples include:
+
+* Printing to standard output
+* Reading input
+* Debugging or tracing execution
+* Interfacing with external tools or subsystems
+
+## Conceptual Model
+
+A machine call is triggered by a **dedicated instruction** (for example, `mcall`) and is handled by a **machine call interface** provided by the runtime.
+
+Conceptually, the flow looks like this:
+
+1. The program executes a machine call instruction
+2. Control is transferred to the machine call handler
+3. The handler inspects registers and execution state
+4. An external operation is performed
+5. Control returns to the virtual machine
+
+The virtual machine itself does **not** implement the behavior — it merely **delegates** execution.
+
+## Machine Call Interface
+
+Machine calls are resolved through a **machine call interface**, which defines how external logic is invoked.
+
+Key characteristics:
+
+* The interface is **runtime-provided**
+* It receives controlled access to the machine state
+* It may read or modify registers
+* It may signal termination or continuation of execution
+
+This design allows:
+
+* Multiple runtime implementations
+* Platform-specific behavior
+* Test and debug environments without changing the core VM
+
+## Register-Based Communication
+
+Machine calls communicate with the program **exclusively through registers**.
+
+Typically:
+
+* One register defines the **machine call identifier**
+* Other registers provide **arguments**
+* Result values (if any) are written back to registers
+
+This ensures:
+
+* No hidden state
+* Deterministic behavior
+* Clear ABI-like conventions
+
+The exact register usage depends on the runtime implementation and calling convention.
+
+## Execution Semantics
+
+From the VM’s perspective, a machine call is:
+
+* A **synchronous operation**
+* Executed atomically from the instruction stream
+* Either completes normally or requests termination
+
+The VM does not interpret the meaning of the call — it only:
+
+* Pauses execution
+* Invokes the handler
+* Resumes execution based on the handler’s result
+
+## Extensibility
+
+Machine calls are designed to be **open-ended**.
+
+New capabilities can be added by:
+
+* Defining new machine call identifiers
+* Implementing new handlers
+* Keeping backward compatibility with existing calls
+
+This allows the system to evolve without modifying:
+
+* The instruction set
+* The assembler
+* Existing programs
+
+## Summary
+
+Machine calls provide a **controlled escape hatch** from the virtual machine into the external world.
+
+They:
+
+* Extend the VM without bloating the instruction set
+* Enable I/O, debugging, and system interaction
+* Preserve determinism and isolation through explicit interfaces
+
+They are a foundational mechanism for building practical systems on top of a minimal virtual machine.
+
+> For more information about the execution process, see the [execution stage documentation](/docs/execution-stage.md).

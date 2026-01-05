@@ -2,43 +2,59 @@
   <img src="/docs/images/star-logo.png" width="300" />
 </div>
 
-<h1 align="center">STAR VIRTUAL MACHINE</h1>
+<h1 align="center">STAR VIRTUAL MACHINE LIB</h1>
 
-A 16-bit virtual machine and assembly programming language designed for educational purposes.
+A extensible 16-bit virtual machine and assembly programming language library designed for educational purposes.
 
 ---
-## A Simple "Hello, World!"
 
-```python
-.data
-    string: .stringz "Hello, World!" # defines a string in memory
-.instr
-start:
-        la $g, string # load string address into $g
-        li $a, 0 # load 0 into $a
-loop:   
-        llb $a, $g # load $a with the byte at address $g
-        beqa $a, $zero, end # if $a is 0, jump to end
-        
-        li $aux1, 7 # load 7 into $aux1
-        move $aux2, $a # move $a to $aux2
-        mcall # syscall
+## A Simple Interface
 
-        inc $g # increments $g by 1
-        ja loop # jump to loop
-end:    nope # no operation (end of program)
+```rust
+use star::prelude::*;
+use std::io::Write;
+
+pub struct SimpleInterface;
+
+impl StarInterface for SimpleInterface {
+    fn mcall(&mut self, s: &mut dyn StarMcallContext) -> bool {
+        let registers = s.get_registers_mut().clone();
+        match registers.aux1 {
+            1 => { // Print byte in aux2
+                let value = registers.aux2 as u8;
+                print!("{value}");
+                std::io::stdout().flush().unwrap();
+            }
+            2 => return true, // Exit program
+            _ => {}
+        }
+        false
+    }
+}
+
+fn main() {
+    let mut star = Star::new();
+
+    star.set_interface(Box::new(SimpleInterface));
+    star.load_from_binary_file(&"./program.asm".to_string()).unwrap();
+    star.execute();
+}
 ```
-
-The **Star Virtual Machine** assembly language is designed to be simple and educational, allowing users to learn the basics of assembly programming and low-level concepts. 
-
-The above program demonstrates how to print "Hello, World!" by loading a string from memory and using a machine call to output each character.
-
 ---
 
 ## Introduction
+
 To get started with the **Star Virtual Machine** you can read the the [introduction](/docs/introduction.md).
 
 ---
+
+## Introduction to Star Interfacing
+
+To get started with the **Star** interfacing system you can read the following documentation:
+- [Interfaces](/docs/interfaces.md): Learn about how to define and use interfaces in the **Star**.
+
+---
+
 ## Documentation
 ### Syntax
 To learn about the syntax of the **Star**
@@ -48,7 +64,7 @@ you can read the following documentation:
 - [Registers](/docs/registers.md): Understand the registers used in the **Star** and their purposes.
 - [Directives](/docs/directives.md): Understand the directives used in **Star**.
 - [Processors](/docs/processors.md): Explore the processors that enhance the assembly language capabilities.
-- [Machine Calls](/docs/machine-calls.md): Learn about system interaction and I/O operations.
+- [Machine Calls](/docs/machine-calls.md): Learn about system interaction.
 
 ### Memory
 To understand the memory model of the **Star**
