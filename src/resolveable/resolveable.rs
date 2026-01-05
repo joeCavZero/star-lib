@@ -5,6 +5,20 @@ use crate::math::*;
 use crate::parseable::*;
 use crate::symbolable::*;
 
+/// Represents the symbol table produced during assembly processing.
+///
+/// This type maps symbol names (such as labels or named constants defined
+/// in the source program) to their resolved 16-bit addresses or values.
+///
+/// # Semantics
+/// - The key (`String`) is the symbolic identifier as written in the source.
+/// - The value (`u16`) is the resolved address or constant value after
+///   parsing and resolution.
+///
+/// # Usage
+/// The symbol table is typically returned after assembling a program and can be
+/// used for debugging, introspection, or tooling that needs to correlate
+/// symbolic names with their final numeric locations.
 pub type StarSymbolTable = HashMap<String, u16>;
 
 pub trait StarResolveable {

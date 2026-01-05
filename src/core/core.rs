@@ -24,6 +24,13 @@ pub struct Star {
 }
 
 impl Star {
+    /// Creates a new `Star` virtual machine instance with randomized data memory,
+    /// empty instruction/position memories, a fresh file table, randomized registers,
+    /// and no attached interface.
+    ///
+    /// # Notes
+    /// - Data memory is filled with random bytes to emulate uninitialized RAM.
+    /// - Registers are initialized using `StarRegisters::new_randomized()`.
     pub fn new() -> Self {
         let mut data_memory = [0; DATA_MEMORY_SIZE];
         for b in data_memory.iter_mut() {
@@ -39,6 +46,13 @@ impl Star {
         }
     }
 
+    /// Resets the virtual machine to a clean state by re-randomizing data memory,
+    /// clearing instruction and position memories, clearing the file table, and
+    /// reinitializing registers.
+    ///
+    /// # Side effects
+    /// - Overwrites all RAM with new random values.
+    /// - Discards the currently loaded program and debug/source mapping state.
     pub fn reset(&mut self) {
         
         let mut new_data_memory = [0; DATA_MEMORY_SIZE];
@@ -54,6 +68,18 @@ impl Star {
         
     }
 
+    /// Loads a program from an assembly source string into the VM.
+    ///
+    /// This method resets the VM, scans the assembly into positioned tokens,
+    /// parses and resolves them into an AST and symbol table, and then generates
+    /// machine code and data into memory.
+    ///
+    /// # Returns
+    /// On success, returns `(symbol_table, data_section_size)`.
+    ///
+    /// # Errors
+    /// Returns an error message and an optional position when scanning fails, or a
+    /// message plus a concrete position for parse/resolve/generate errors.
     pub fn load_from_assembly(&mut self, source: &String) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {
         self.reset();
         match self.scan(source) {
@@ -67,6 +93,17 @@ impl Star {
         }
     }
 
+    /// Loads a program from an assembly file path into the VM.
+    ///
+    /// This method resets the VM, scans the file contents into positioned tokens,
+    /// then parses, resolves, and generates machine code and data into memory.
+    ///
+    /// # Returns
+    /// On success, returns `(symbol_table, data_section_size)`.
+    ///
+    /// # Errors
+    /// Returns an error message and an optional position when scanning fails, or a
+    /// message plus a concrete position for parse/resolve/generate errors.
     pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {        
         self.reset();
         match self.scan_file(file_path) {
@@ -80,6 +117,14 @@ impl Star {
         }
     }
 
+    /// Processes assembly positioned tokens through the full pipeline:
+    /// parse → resolve → generate.
+    ///
+    /// # Returns
+    /// On success, returns `(symbol_table, data_section_size)`.
+    ///
+    /// # Errors
+    /// Returns `(message, position)` for any failure in parse/resolve/generate.
     fn process_positioned_tokens_from_assembly(&mut self, ptokens: Vec<StarPositionedToken>) ->Result<(StarSymbolTable, usize), (String, StarPosition)> {
         match self.parse(&ptokens) {
             Ok(mut ast) => {
@@ -99,6 +144,17 @@ impl Star {
         }
     }
 
+    /// Loads a program from a binary file on disk.
+    ///
+    /// The file is canonicalized, read as text, normalized for line endings,
+    /// and then passed to `load_from_binary`.
+    ///
+    /// # Returns
+    /// On success, returns the number of bytes loaded into the data section.
+    ///
+    /// # Errors
+    /// Returns an error message and optional position (usually `None` for I/O and
+    /// path errors).
     pub fn load_from_binary_file(&mut self, file_path: &str) -> Result<usize, (String, Option<StarPosition>)> {
         self.reset();
 
@@ -125,6 +181,20 @@ impl Star {
         return self.load_from_binary(&file_content);
     }
 
+    /// Loads a program from a textual "binary assembly" representation.
+    ///
+    /// The input is expected to contain the sections `.instr` and `.data`, where each
+    /// token is an 8-bit binary string (e.g. `01010101`). Instructions are appended
+    /// to `instruction_memory` and `.data` bytes are collected and then copied into
+    /// `data_memory` starting at address 0.
+    ///
+    /// # Returns
+    /// On success, returns the number of bytes loaded into the data section.
+    ///
+    /// # Errors
+    /// - Returns `(message, Some(position))` for malformed instruction/data tokens
+    ///   or unknown sections.
+    /// - Returns `(message, None)` if data exceeds available memory bounds.
     pub fn load_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<StarPosition>)> {
         self.reset();
 
@@ -314,6 +384,20 @@ impl Star {
         Ok(data_memory_vector.len())
     }
 
+    /// Saves the currently loaded instruction memory and a slice of data memory to a
+    /// textual "binary assembly" file.
+    ///
+    /// The output format begins with `.instr` followed by 8-bit binary strings for
+    /// each instruction byte, then `.data` followed by `data_section_size` bytes from
+    /// data memory.
+    ///
+    /// # Parameters
+    /// - `file_path`: Destination path to create/overwrite.
+    /// - `data_section_size`: How many bytes from data memory to serialize.
+    ///
+    /// # Errors
+    /// Returns a string error if the file cannot be created/written or if the
+    /// requested data slice exceeds memory bounds.
     pub fn save_loaded_binary(&self, file_path: &str, data_section_size: usize) -> Result<(), String> {
         let mut file = match File::create(file_path.to_string()) {
             Ok(f) => f,
@@ -354,10 +438,18 @@ impl Star {
         Ok(())
     }
     
+    /// Looks up a file id in `file_table` by its full path.
+    ///
+    /// # Returns
+    /// `Some(id)` if the path exists in the table, otherwise `None`.
     pub fn get_file_id_by_path(&self, file_path: &String) -> Option<usize> {
         self.file_table.iter().find_map(|(id, path)| if path == file_path { Some(*id) } else { None })
     }
 
+    /// Returns the stored file name/path for a given file id.
+    ///
+    /// # Returns
+    /// The associated string if found, otherwise `"Unknown file"`.
     pub fn get_file_name(&self, file_id: usize) -> String {
         match self.file_table.get(&file_id) {
             Some(name) => name.clone(),
@@ -365,17 +457,49 @@ impl Star {
         }
     }
 
+    /// Attaches a system-call interface implementation to the VM.
+    ///
+    /// This interface may be invoked by the `Mcall` instruction during execution.
     pub fn set_interface(&mut self, interface: Box<dyn StarInterface>) {
         self.interface = Some(interface);
     }
 
+    /// Detaches and returns the currently attached interface, leaving `None` in its place.
+    ///
+    /// # Returns
+    /// The interface if one was attached, otherwise `None`.
     pub fn take_interface(&mut self) -> Option<Box<dyn StarInterface>> {
         self.interface.take()
     }
 
+    /// Takes a mutable reference to the currently attached interface and removes it
+    /// from the internal `Option` by calling `take()` on the mutable reference.
+    ///
+    /// # Returns
+    /// A mutable reference to the boxed interface if present, otherwise `None`.
+    ///
+    /// # Notes
+    /// This pattern is unusual because it removes the interface from `self` while
+    /// returning a mutable reference derived from `as_mut()`. Use with care to avoid
+    /// surprising ownership/lifetime expectations.
     pub fn take_interface_mut(&mut self) -> Option<&mut Box<dyn StarInterface>> {
         self.interface.as_mut().take()
     }
+
+    /// Executes the currently loaded program until the program counter reaches the end
+    /// of instruction memory or an interface call requests termination.
+    ///
+    /// The VM fetches 16-bit instructions, tracks their source positions, performs
+    /// a fast-path for NOPs, decodes instruction formats, and executes arithmetic,
+    /// logic, branching, memory access, jumping, and `Mcall` (system call) behavior.
+    ///
+    /// # Returns
+    /// `Ok(())` when execution completes normally.
+    ///
+    /// # Errors
+    /// Returns `(message, position)` for runtime errors such as program counter overflow,
+    /// invalid instruction encodings, or memory access failures. The position is taken
+    /// from `position_memory` when available.
     pub fn execute(&mut self) -> Result<(), (String, Option<StarPosition>)> {
         let instruction_memory_len = match u16::try_from(self.instruction_memory.len()) {
             Ok(len) => len,
