@@ -9,8 +9,6 @@ The **Star Virtual Machine** is a 16-bit virtual machine and programming languag
 
 The **Star** is designed to be easy to understand and use, making it an ideal tool for students and beginners in computer science. It features a small set of instructions, a straightforward memory model, and a focus on basic operations that are essential for understanding how computers work.
 
-This project includes a collection of example assembly programs located in the [examples](/examples/) folder. These examples are designed to help you learn and practice assembly programming with the Star Virtual Machine. The programs demonstrate a variety of concepts, ranging from simple arithmetic operations to more advanced algorithms and data structures. Exploring and modifying these examples is a great way to deepen your understanding of assembly language and the Star VM architecture.
-
 ## Installation
 To install the **Star Virtual Machine**, you need to build it from source.
 
