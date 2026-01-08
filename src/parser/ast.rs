@@ -17,7 +17,6 @@ pub enum StarCustomSection {
 
 pub type StarCustomSections = HashMap<String, StarCustomSection>;
 
-
 #[derive(Debug, Clone)]
 pub struct StarInstrCamp {
     pub label_declarations: Vec<StarPositionedToken>,
@@ -39,16 +38,11 @@ pub enum StarDataCampArg {
     Multiple(Vec<StarPositionedToken>),
 }
 
-
-
-
-
-
 #[derive(Debug, Clone)]
 pub struct StarAst {
     pub data_section: StarDataSection,
     pub instr_section: StarInstrSection,
-    pub custom_sections: StarCustomSections
+    pub custom_sections: StarCustomSections,
 }
 
 impl StarAst {
@@ -76,197 +70,223 @@ impl StarAst {
         let mut symbol_table: StarSymbolTable = HashMap::new();
 
         // >>>> DATA MEMORY <<<<
-        let mut data_memory_counter: usize = 0;
+        if let Err(er) = fill_symbol_table_with_data_section(&self.data_section, &mut symbol_table) {
+            return Err(er);
+        }
 
-        for data_camp in self.data_section.iter() {
-            // ==== Process of collecting labels ====
-            for label_ptk in data_camp.label_declarations.iter() {
-                match label_ptk.token {
-                    StarToken::LabelDeclaration(ref label_name) => {
-                        if symbol_table.contains_key(label_name) {
-                            return Err((
-                                format!("Label '{}' already declared", label_name),
-                                label_ptk.position,
-                            ));
-                        } else {
-                            match u16::try_from(data_memory_counter) {
-                                Ok(address) => {
-                                    symbol_table.insert(label_name.clone(), address);
-                                }
-                                Err(_) => {
-                                    return Err((
-                                        format!(
-                                            "Label '{}' address exceeds 16 bits",
-                                            label_name
-                                        ),
-                                        label_ptk.position,
-                                    ));
-                                }
-                            }
-                        }
+        // >>>> INSTRUCTION MEMORY <<<<
+        if let Err(er) = fill_symbol_table_with_instr_section(&self.instr_section, &mut symbol_table) {
+            return Err(er);
+        }
+
+        // >>>> CUSTOM MEMORIES <<<<
+
+        for (_, v) in self.custom_sections.iter() {
+            match v {
+                StarCustomSection::Data(ds) => {
+                    if let Err(er) = fill_symbol_table_with_data_section(&ds, &mut symbol_table) {
+                        return Err(er);
                     }
-                    _ => unreachable!(),
+                }
+                StarCustomSection::Instr(is) => {
+                    if let Err(er) = fill_symbol_table_with_instr_section(&is, &mut symbol_table) {
+                        return Err(er);
+                    }
                 }
             }
+        }
 
-            // ==== Process of moving the data memory counter ====
-            match data_camp.directive.token {
-                // ==== BYTE DIRECTIVE ====
-                StarToken::StarDirective(StarDirective::Byte) => {
-                    if let StarDataCampArg::Multiple(ref ptk_args) = data_camp.arg {
-                        for ptk_arg in ptk_args.iter() {
-                            match data_memory_counter.checked_add(1) {
-                                Some(new_value) => {
-                                    if new_value > STAR_MEMORY_64KB {
-                                        return Err((
-                                            "Data memory overflow".to_string(),
-                                            ptk_arg.position,
-                                        ));
-                                    } else {
-                                        data_memory_counter = new_value;
-                                    }
-                                }
-                                None => {
-                                    return Err((
-                                        "Data memory overflow".to_string(),
-                                        ptk_arg.position,
-                                    ))
-                                }
+        Ok(symbol_table)
+    }
+}
+
+fn fill_symbol_table_with_data_section(data_section: &StarDataSection, symbol_table: &mut StarSymbolTable) -> Result<(), (String, StarPosition)> {
+    let mut data_memory_counter: usize = 0;
+
+    for data_camp in data_section.iter() {
+        // ==== Process of collecting labels ====
+        for label_ptk in data_camp.label_declarations.iter() {
+            match label_ptk.token {
+                StarToken::LabelDeclaration(ref label_name) => {
+                    if symbol_table.contains_key(label_name) {
+                        return Err((
+                            format!("Label '{}' already declared", label_name),
+                            label_ptk.position,
+                        ));
+                    } else {
+                        match u16::try_from(data_memory_counter) {
+                            Ok(address) => {
+                                symbol_table.insert(label_name.clone(), address);
+                            }
+                            Err(_) => {
+                                return Err((
+                                    format!("Label '{}' address exceeds 16 bits", label_name),
+                                    label_ptk.position,
+                                ));
                             }
                         }
-                    } else {
-                        unreachable!();
                     }
                 }
-
-                // ==== WORD DIRECTIVE ====
-                StarToken::StarDirective(StarDirective::Word) => {
-                    if let StarDataCampArg::Multiple(ref ptk_args) = data_camp.arg {
-                        for ptk_arg in ptk_args.iter() {
-                            match data_memory_counter.checked_add(2) {
-                                Some(new_value) => {
-                                    if new_value > STAR_MEMORY_64KB {
-                                        return Err((
-                                            "Data memory overflow".to_string(),
-                                            ptk_arg.position,
-                                        ));
-                                    } else {
-                                        data_memory_counter = new_value;
-                                    }
-                                }
-                                None => {
-                                    return Err((
-                                        "Data memory overflow".to_string(),
-                                        ptk_arg.position,
-                                    ))
-                                }
-                            }
-                        }
-                    } else {
-                        unreachable!();
-                    }
-                }
-
-                // ==== SPACE DIRECTIVE ====
-                StarToken::StarDirective(StarDirective::Space) => {
-                    if let StarDataCampArg::Unique(ref ptk_arg) = data_camp.arg {
-                        match ptk_arg.token {
-                            StarToken::NumberLiteral(ref num_string) => {
-                                let num = match u16_from_string(num_string.clone()) {
-                                    Ok(n) => n,
-                                    Err(err) => {
-                                        return Err((err.to_string(), ptk_arg.position));
-                                    }
-                                };
-
-                                match data_memory_counter.checked_add(num as usize) {
-                                    Some(ndmv) => {
-                                        if ndmv > STAR_MEMORY_64KB {
-                                            return Err((
-                                                "Data memory overflow".to_string(),
-                                                ptk_arg.position,
-                                            ));
-                                        } else {
-                                            data_memory_counter = ndmv;
-                                        }
-                                    }
-                                    None => {
-                                        return Err((
-                                            "Data memory overflow".to_string(),
-                                            ptk_arg.position,
-                                        ))
-                                    }
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-                    } else {
-                        unreachable!();
-                    }
-                }
-
-                // ==== STRING AND STRINGZ DIRECTIVES ====
-                StarToken::StarDirective(StarDirective::String)
-                | StarToken::StarDirective(StarDirective::Stringz) => {
-                    if let StarDataCampArg::Unique(ref ptk_arg) = data_camp.arg {
-                        match ptk_arg.token {
-                            StarToken::StringLiteral(ref string_literal) => {
-                                let mut string_len = string_literal.len();
-                                if data_camp.directive.token == StarToken::StarDirective(StarDirective::Stringz)
-                                {
-                                    string_len += 1; // null terminator add
-                                }
-
-                                let len_u16 = match u16::try_from(string_len) {
-                                    Ok(len) => len,
-                                    Err(_) => {
-                                        return Err((
-                                            "String length exceeds 16 bits".to_string(),
-                                            ptk_arg.position,
-                                        ));
-                                    }
-                                };
-
-                                match data_memory_counter.checked_add(len_u16 as usize) {
-                                    Some(new_value) => {
-                                        if new_value > STAR_MEMORY_64KB {
-                                            return Err((
-                                                "Data memory overflow".to_string(),
-                                                ptk_arg.position,
-                                            ));
-                                        } else {
-                                            data_memory_counter = new_value;
-                                        }
-                                    }
-                                    None => {
-                                        return Err((
-                                            "Data memory overflow".to_string(),
-                                            ptk_arg.position,
-                                        ))
-                                    }
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-                    } else {
-                        unreachable!();
-                    }
-                }
-
-                StarToken::StarDirective(StarDirective::Checkpoint) => {
-                    if let StarDataCampArg::Empty = data_camp.arg {
-                        // Nothing to do here
-                    } else {
-                        unreachable!();
-                    }
-                }
-
                 _ => unreachable!(),
             }
         }
 
-        // >>>> INSTRUCTION MEMORY <<<<
-        for (instruction_index, instruction) in self.instr_section.iter().enumerate() {
+        // ==== Process of moving the data memory counter ====
+        match data_camp.directive.token {
+            // ==== BYTE DIRECTIVE ====
+            StarToken::StarDirective(StarDirective::Byte) => {
+                if let StarDataCampArg::Multiple(ref ptk_args) = data_camp.arg {
+                    for ptk_arg in ptk_args.iter() {
+                        match data_memory_counter.checked_add(1) {
+                            Some(new_value) => {
+                                if new_value > STAR_MEMORY_64KB {
+                                    return Err((
+                                        "Data memory overflow".to_string(),
+                                        ptk_arg.position,
+                                    ));
+                                } else {
+                                    data_memory_counter = new_value;
+                                }
+                            }
+                            None => {
+                                return Err(("Data memory overflow".to_string(), ptk_arg.position));
+                            }
+                        }
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+
+            // ==== WORD DIRECTIVE ====
+            StarToken::StarDirective(StarDirective::Word) => {
+                if let StarDataCampArg::Multiple(ref ptk_args) = data_camp.arg {
+                    for ptk_arg in ptk_args.iter() {
+                        match data_memory_counter.checked_add(2) {
+                            Some(new_value) => {
+                                if new_value > STAR_MEMORY_64KB {
+                                    return Err((
+                                        "Data memory overflow".to_string(),
+                                        ptk_arg.position,
+                                    ));
+                                } else {
+                                    data_memory_counter = new_value;
+                                }
+                            }
+                            None => {
+                                return Err(("Data memory overflow".to_string(), ptk_arg.position));
+                            }
+                        }
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+
+            // ==== SPACE DIRECTIVE ====
+            StarToken::StarDirective(StarDirective::Space) => {
+                if let StarDataCampArg::Unique(ref ptk_arg) = data_camp.arg {
+                    match ptk_arg.token {
+                        StarToken::NumberLiteral(ref num_string) => {
+                            let num = match u16_from_string(num_string.clone()) {
+                                Ok(n) => n,
+                                Err(err) => {
+                                    return Err((err.to_string(), ptk_arg.position));
+                                }
+                            };
+
+                            match data_memory_counter.checked_add(num as usize) {
+                                Some(ndmv) => {
+                                    if ndmv > STAR_MEMORY_64KB {
+                                        return Err((
+                                            "Data memory overflow".to_string(),
+                                            ptk_arg.position,
+                                        ));
+                                    } else {
+                                        data_memory_counter = ndmv;
+                                    }
+                                }
+                                None => {
+                                    return Err((
+                                        "Data memory overflow".to_string(),
+                                        ptk_arg.position,
+                                    ));
+                                }
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+
+            // ==== STRING AND STRINGZ DIRECTIVES ====
+            StarToken::StarDirective(StarDirective::String)
+            | StarToken::StarDirective(StarDirective::Stringz) => {
+                if let StarDataCampArg::Unique(ref ptk_arg) = data_camp.arg {
+                    match ptk_arg.token {
+                        StarToken::StringLiteral(ref string_literal) => {
+                            let mut string_len = string_literal.len();
+                            if data_camp.directive.token
+                                == StarToken::StarDirective(StarDirective::Stringz)
+                            {
+                                string_len += 1; // null terminator add
+                            }
+
+                            let len_u16 = match u16::try_from(string_len) {
+                                Ok(len) => len,
+                                Err(_) => {
+                                    return Err((
+                                        "String length exceeds 16 bits".to_string(),
+                                        ptk_arg.position,
+                                    ));
+                                }
+                            };
+
+                            match data_memory_counter.checked_add(len_u16 as usize) {
+                                Some(new_value) => {
+                                    if new_value > STAR_MEMORY_64KB {
+                                        return Err((
+                                            "Data memory overflow".to_string(),
+                                            ptk_arg.position,
+                                        ));
+                                    } else {
+                                        data_memory_counter = new_value;
+                                    }
+                                }
+                                None => {
+                                    return Err((
+                                        "Data memory overflow".to_string(),
+                                        ptk_arg.position,
+                                    ));
+                                }
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+
+            StarToken::StarDirective(StarDirective::Checkpoint) => {
+                if let StarDataCampArg::Empty = data_camp.arg {
+                    // Nothing to do here
+                } else {
+                    unreachable!();
+                }
+            }
+
+            _ => unreachable!(),
+        }
+    }
+
+    Ok(())
+}
+
+fn fill_symbol_table_with_instr_section(instr_section: &StarInstrSection, symbol_table: &mut StarSymbolTable) -> Result<(), (String, StarPosition)> {
+    for (instruction_index, instruction) in instr_section.iter().enumerate() {
             for label_ptk in instruction.label_declarations.iter() {
                 match label_ptk.token {
                     StarToken::LabelDeclaration(ref label_name) => {
@@ -282,10 +302,7 @@ impl StarAst {
                                 }
                                 Err(_) => {
                                     return Err((
-                                        format!(
-                                            "Label '{}' address exceeds 16 bits",
-                                            label_name
-                                        ),
+                                        format!("Label '{}' address exceeds 16 bits", label_name),
                                         label_ptk.position,
                                     ));
                                 }
@@ -296,7 +313,5 @@ impl StarAst {
                 }
             }
         }
-
-        Ok(symbol_table)
-    }
+    Ok(())
 }
