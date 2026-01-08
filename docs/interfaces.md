@@ -103,30 +103,12 @@ To use an interface, attach it to the `Star` instance **before execution**:
 
 ```rust
 fn main() {
-    let mut star = Star::new();
-
+    let mut star = Star::default();
     star.set_interface(Box::new(SimpleInterface));
-    match star.load_from_assembly_file(&"./program.asm".to_string()) {
-        Ok((_,_)) => {
-            match star.execute() {
-                Ok(_) => println!("Program executed successfully"),
-                Err((err, pos)) => {
-                    let pos_string = match pos {
-                        Some(p) => p.get_position_path(&star),
-                        None => "unknown".to_string(),
-                    };
-                    println!("Error {} on [{}]", err.as_str(), pos_string.as_str());
-                }
-            }
-        }
-        Err((err, pos)) => {
-            let pos_string = match pos {
-                Some(p) => p.get_position_path(&star),
-                None => "unknown".to_string(),
-            };
-            println!("Error {} on [{}]", err.as_str(), pos_string.as_str());
-        }
-    }
+
+    star.load_memory_from_assembly_file(&"./program.asm".to_string()).unwrap();
+    star.execute().unwrap();
+    println!();
 }
 ```
 

@@ -27,7 +27,7 @@ pub fn generate_bytes_from_ast(ast: &StarAst) -> Result<(StarDataMemoryBytes, St
                             StarCustomSection::Data(ds) => {
                                 match generate_data_memory(&ds) {
                                     Ok(ds_bytes) => {
-                                        custom_mems.insert(k.name.clone(), ds_bytes.clone());
+                                        custom_mems.insert(k.clone(), ds_bytes.clone());
                                     }
                                     Err(e) => return Err(e),
                                 }
@@ -35,8 +35,8 @@ pub fn generate_bytes_from_ast(ast: &StarAst) -> Result<(StarDataMemoryBytes, St
                             StarCustomSection::Instr(is) => {
                                 match generate_instruction_memory(&is) {
                                     Ok((is_bytes, is_positions)) => {
-                                        custom_mems.insert(k.name.clone(), is_bytes.clone());
-                                        custom_pos_mems.insert(k.name.clone(), is_positions.clone());
+                                        custom_mems.insert(k.clone(), is_bytes.clone());
+                                        custom_pos_mems.insert(k.clone(), is_positions.clone());
                                     }
                                     Err(e) => return Err(e),
                                 }
@@ -232,11 +232,11 @@ fn generate_instruction_memory(instr_section: &StarInstrSection) -> Result<(Vec<
     let mut position_memory: Vec<StarPosition> = Vec::new();
     
     for instr_camp in instr_section.iter() {
-        if let StarToken::StarInstruction(instruction) = instr_camp.instruction.token.clone() {
+        if let StarToken::Instruction(instruction) = instr_camp.instruction.token.clone() {
             match instruction.format() {
                 StarFormat::Trinity => {
                     if let StarSequence::Three(reg_ptk_1, reg_ptk_2, reg_ptk_3) = instr_camp.sequence.clone() {
-                        if let (StarToken::StarGeneralRegister(reg1), StarToken::StarGeneralRegister(reg2), StarToken::StarGeneralRegister(reg3)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone(), reg_ptk_3.token.clone()) {
+                        if let (StarToken::GeneralRegister(reg1), StarToken::GeneralRegister(reg2), StarToken::GeneralRegister(reg3)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone(), reg_ptk_3.token.clone()) {
                             let format: u16 = fold_trinity(
                                 instruction,
                                 reg1,
@@ -258,7 +258,7 @@ fn generate_instruction_memory(instr_section: &StarInstrSection) -> Result<(Vec<
                 }
                 StarFormat::Hime => {
                     if let StarSequence::Two(reg_ptk, imm_ptk) = instr_camp.sequence.clone() {
-                        if let (StarToken::StarGeneralRegister(reg), StarToken::NumberLiteral(imm_string)) = (reg_ptk.token.clone(), imm_ptk.token.clone()) {
+                        if let (StarToken::GeneralRegister(reg), StarToken::NumberLiteral(imm_string)) = (reg_ptk.token.clone(), imm_ptk.token.clone()) {
                             match u8_from_string(imm_string) {
                                 Ok(imm) => {
                                     let format: u16 = fold_hime(
@@ -289,7 +289,7 @@ fn generate_instruction_memory(instr_section: &StarInstrSection) -> Result<(Vec<
                 }
                 StarFormat::Pair => {
                     if let StarSequence::Two(reg_ptk_1, reg_ptk_2) = instr_camp.sequence.clone() {
-                        if let (StarToken::StarGeneralRegister(reg1), StarToken::StarGeneralRegister(reg2)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone()) {
+                        if let (StarToken::GeneralRegister(reg1), StarToken::GeneralRegister(reg2)) = (reg_ptk_1.token.clone(), reg_ptk_2.token.clone()) {
                             let format: u16 = fold_pair(
                                 instruction,
                                 reg1,
@@ -310,7 +310,7 @@ fn generate_instruction_memory(instr_section: &StarInstrSection) -> Result<(Vec<
                 }
                 StarFormat::Clover => {
                     if let StarSequence::One(reg_ptk) = instr_camp.sequence.clone() {
-                        if let StarToken::StarGeneralRegister(reg) = reg_ptk.token.clone() {
+                        if let StarToken::GeneralRegister(reg) = reg_ptk.token.clone() {
                             let format: u16 = fold_clover(
                                 instruction,
                                 reg,

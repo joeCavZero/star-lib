@@ -52,7 +52,7 @@ impl StarPosition {
     pub fn get_position_path(&self, star: &Star) -> String {
         match self.file {
             Some(file_num) => {
-                let file_name = star.get_file_name(file_num);
+                let file_name: String = star.get_file_name_by_id(file_num).unwrap_or("unknown".to_string());
                 match self.column {
                     Some(column_num) => {
                         format!(

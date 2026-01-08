@@ -15,7 +15,7 @@ pub enum StarCustomSection {
     Instr(StarInstrSection),
 }
 
-pub type StarCustomSections = HashMap<StarCustomSectionDefinition, StarCustomSection>;
+pub type StarCustomSections = HashMap<String, StarCustomSection>;
 
 
 #[derive(Debug, Clone)]
@@ -52,12 +52,24 @@ pub struct StarAst {
 }
 
 impl StarAst {
-    pub fn new() -> Self {
-        Self  {
+    pub fn new(custom_sections: &Vec<StarCustomSectionDefinition>) -> Self {
+        let mut ast = StarAst {
             data_section: Vec::new(),
             instr_section: Vec::new(),
             custom_sections: HashMap::new(),
+        };
+
+        // cria todas as custom sections vazias no AST
+        for csd in custom_sections.iter() {
+            let section = match csd.section_type {
+                StarSectionParsingType::Data => StarCustomSection::Data(Vec::new()),
+                StarSectionParsingType::Instr => StarCustomSection::Instr(Vec::new()),
+            };
+
+            ast.custom_sections.insert(csd.name.clone(), section);
         }
+
+        ast
     }
 
     pub fn get_symbol_table(&mut self) -> Result<StarSymbolTable, (String, StarPosition)> {

@@ -15,3 +15,4 @@ pub use crate::core::position_memory::*;
 pub use crate::core::instruction_memory::*;
 pub use crate::core::data_memory::*;
 pub use crate::core::file_table::*;
+pub use crate::core::section::StarSectionParsingType;

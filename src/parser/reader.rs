@@ -4,13 +4,13 @@ use crate::core::*;
 pub fn read_r_r_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma) => {
                         if let StarToken::Comma = comma.token {
                             match ptokens.get(start_index + 2) {
                                 Some(tk2) => {
-                                    if let StarToken::StarGeneralRegister(_) = tk2.token {
+                                    if let StarToken::GeneralRegister(_) = tk2.token {
                                         Ok(StarSequence::Two(tk1.clone(), tk2.clone()))
                                     } else {
                                         Err(("Expected a register after comma in this sequence".to_string(), tk2.position))
@@ -35,7 +35,7 @@ pub fn read_r_r_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize,
 pub fn read_r_n_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma) => {
                         if let StarToken::Comma = comma.token {
@@ -66,19 +66,19 @@ pub fn read_r_n_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize,
 pub fn read_r_r_r_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma1) => {
                         if let StarToken::Comma = comma1.token {
                             match ptokens.get(start_index + 2) {
                                 Some(tk2) => {
-                                    if let StarToken::StarGeneralRegister(_) = tk2.token {
+                                    if let StarToken::GeneralRegister(_) = tk2.token {
                                         match ptokens.get(start_index + 3) {
                                             Some(comma2) => {
                                                 if let StarToken::Comma = comma2.token {
                                                     match ptokens.get(start_index + 4) {
                                                         Some(tk3) => {
-                                                            if let StarToken::StarGeneralRegister(_) = tk3.token {
+                                                            if let StarToken::GeneralRegister(_) = tk3.token {
                                                                 Ok( StarSequence::Three(tk1.clone(), tk2.clone(), tk3.clone() ))
                                                             } else {
                                                                 Err(("Expected a register after second comma in this sequence".to_string(), tk3.position))
@@ -115,7 +115,7 @@ pub fn read_r_r_r_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usiz
 pub fn read_r_id_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma) => {
                         if let StarToken::Comma = comma.token {
@@ -148,13 +148,13 @@ pub fn read_r_r_br_n_br(ptokens: &Vec<StarPositionedToken>, start_index: usize, 
     // e.g.: lw $r1, $r2[10]
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma) => {
                         if let StarToken::Comma = comma.token {
                             match ptokens.get(start_index + 2) {
                                 Some(tk2) => {
-                                    if let StarToken::StarGeneralRegister(_) = tk2.token {
+                                    if let StarToken::GeneralRegister(_) = tk2.token {
                                         match ptokens.get(start_index + 3) {
                                             Some(left_square_bracket) => {
                                                 if let StarToken::LeftSquareBracket = left_square_bracket.token {
@@ -209,7 +209,7 @@ pub fn read_r_id_br_n_br(ptokens: &Vec<StarPositionedToken>, start_index: usize,
     // e.g.: $r1, label[10]
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma) => {
                         if let StarToken::Comma = comma.token {
@@ -267,7 +267,7 @@ pub fn read_r_id_br_n_br(ptokens: &Vec<StarPositionedToken>, start_index: usize,
 pub fn read_r_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 Ok(StarSequence::One(tk1.clone()))
             } else {
                 Err(("Expected a register in this sequence".to_string(), base_position))
@@ -293,13 +293,13 @@ pub fn read_id_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, 
 pub fn read_r_r_id_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma1) => {
                         if let StarToken::Comma = comma1.token {
                             match ptokens.get(start_index + 2) {
                                 Some(tk2) => {
-                                    if let StarToken::StarGeneralRegister(_) = tk2.token {
+                                    if let StarToken::GeneralRegister(_) = tk2.token {
                                         match ptokens.get(start_index + 3) {
                                             Some(comma2) => {
                                                 if let StarToken::Comma = comma2.token {
@@ -342,13 +342,13 @@ pub fn read_r_r_id_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usi
 pub fn read_r_r_n_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {
     match ptokens.get(start_index) {
         Some(tk1) => {
-            if let StarToken::StarGeneralRegister(_) = tk1.token {
+            if let StarToken::GeneralRegister(_) = tk1.token {
                 match ptokens.get(start_index + 1) {
                     Some(comma1) => {
                         if let StarToken::Comma = comma1.token {
                             match ptokens.get(start_index + 2) {
                                 Some(tk2) => {
-                                    if let StarToken::StarGeneralRegister(_) = tk2.token {
+                                    if let StarToken::GeneralRegister(_) = tk2.token {
                                         match ptokens.get(start_index + 3) {
                                             Some(comma2) => {
                                                 if let StarToken::Comma = comma2.token {
