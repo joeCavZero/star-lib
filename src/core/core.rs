@@ -6,19 +6,20 @@ use std::io::Write;
 use std::mem::transmute;
 
 use crate::core::*;
-use crate::generateable::*;
-use crate::resolveable::*;
-use crate::scannable::*;
-use crate::parseable::*;
+use crate::generation::*;
+use crate::resolver::*;
+use crate::scanner::*;
+use crate::parser::*;
 
 use crate::math::*;
 
+
+
 pub struct Star {
     pub file_table: HashMap<usize, String>,
-    pub data_memory: StarDataMemory,
-    pub instruction_memory: StarInstructionMemory,
-    pub position_memory: StarPositionMemory,
+    pub memories: StarMemories,
     pub registers: StarRegisters,
+    pub custom_memories_definitions: Vec<StarCustomSectionDefinition>,
 
     pub interface: Option<Box<dyn StarInterface>>,
 }
@@ -27,43 +28,22 @@ impl Star {
     /// Creates a new `Star` virtual machine instance with randomized data memory,
     /// empty instruction/position memories, a fresh file table, randomized registers,
     /// and no attached interface.
-    ///
-    /// # Notes
-    /// - Data memory is filled with random bytes to emulate uninitialized RAM.
-    /// - Registers are initialized using `StarRegisters::new_randomized()`.
     pub fn new() -> Self {
-        let mut data_memory = [0; DATA_MEMORY_SIZE];
-        for b in data_memory.iter_mut() {
-            *b = rand::random::<u8>();
-        }
         Self {
             file_table: HashMap::new(),
-            data_memory: data_memory,
-            instruction_memory: Vec::new(),
-            position_memory: Vec::new(),
+            memories: StarMemories::new(),
             registers: StarRegisters::new_randomized(),
             interface: None,
+            custom_memories_definitions: Vec::new(),
         }
     }
 
     /// Resets the virtual machine to a clean state by re-randomizing data memory,
     /// clearing instruction and position memories, clearing the file table, and
     /// reinitializing registers.
-    ///
-    /// # Side effects
-    /// - Overwrites all RAM with new random values.
-    /// - Discards the currently loaded program and debug/source mapping state.
     pub fn reset(&mut self) {
-        
-        let mut new_data_memory = [0; DATA_MEMORY_SIZE];
-        for b in new_data_memory.iter_mut() {
-            *b = rand::random::<u8>();
-        }
-
-        self.data_memory = new_data_memory;
-        self.instruction_memory.clear();
+        self.memories = StarMemories::new();
         self.file_table.clear();
-        self.position_memory.clear();
         self.registers = StarRegisters::new_randomized();
         
     }
@@ -73,23 +53,21 @@ impl Star {
     /// This method resets the VM, scans the assembly into positioned tokens,
     /// parses and resolves them into an AST and symbol table, and then generates
     /// machine code and data into memory.
-    ///
-    /// # Returns
-    /// On success, returns `(symbol_table, data_section_size)`.
-    ///
-    /// # Errors
-    /// Returns an error message and an optional position when scanning fails, or a
-    /// message plus a concrete position for parse/resolve/generate errors.
-    pub fn load_from_assembly(&mut self, source: &String) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {
+    pub fn load_memory_from_assembly(&mut self, source: &String) -> Result<(StarSymbolTable, StarCustomMemoriesHashMap, StarCustomMemoryPositionsHashMap), String> {
         self.reset();
         match self.scan(source) {
             Ok(ptokens) => {
                 match self.process_positioned_tokens_from_assembly(ptokens) {
-                    Ok(okay) => Ok(okay),
-                    Err((e_string, e_position)) => return Err((e_string, Some(e_position))),
+                    Ok((dm, im, pm, cm, cpm, st)) => {
+                        if let Err(e) = self.load_data_instructions_and_position_memory(&dm, &im, &pm) {
+                            return Err(e);
+                        }
+                        Ok((st, cm, cpm))
+                    }
+                    Err((e_string, e_position)) => return Err(self.get_error_message_from_message_and_position(e_string, e_position)),
                 }
             }
-            Err(e) => return Err(e),
+            Err((e_string, e_position)) => return Err(self.get_error_message_from_message_and_optional_position(e_string, e_position)),
         }
     }
 
@@ -97,43 +75,34 @@ impl Star {
     ///
     /// This method resets the VM, scans the file contents into positioned tokens,
     /// then parses, resolves, and generates machine code and data into memory.
-    ///
-    /// # Returns
-    /// On success, returns `(symbol_table, data_section_size)`.
-    ///
-    /// # Errors
-    /// Returns an error message and an optional position when scanning fails, or a
-    /// message plus a concrete position for parse/resolve/generate errors.
-    pub fn load_from_assembly_file(&mut self, file_path: &str) -> Result<(StarSymbolTable, usize), (String, Option<StarPosition>)> {        
+    pub fn load_memory_from_assembly_file(&mut self, file_path: &String) -> Result<(StarSymbolTable, StarCustomMemoriesHashMap, StarCustomMemoryPositionsHashMap), String> {        
         self.reset();
         match self.scan_file(file_path) {
             Ok(ptokens) => {
                 match self.process_positioned_tokens_from_assembly(ptokens) {
-                    Ok(okay) => Ok(okay),
-                    Err((e_string, e_position)) => return Err((e_string, Some(e_position))),
+                    Ok((dm, im, pm, cm, cpm, st)) => {
+                        if let Err(e) = self.load_data_instructions_and_position_memory(&dm, &im, &pm) {
+                            return Err(e);
+                        }
+                        Ok((st, cm, cpm))
+                    }
+                    Err((e_string, e_position)) => return Err(self.get_error_message_from_message_and_position(e_string, e_position)),
                 }
             }
-            Err(e) => return Err(e),
+            Err((e_string, e_position)) => return Err(self.get_error_message_from_message_and_optional_position(e_string, e_position)),
         }
     }
 
     /// Processes assembly positioned tokens through the full pipeline:
     /// parse → resolve → generate.
-    ///
-    /// # Returns
-    /// On success, returns `(symbol_table, data_section_size)`.
-    ///
-    /// # Errors
-    /// Returns `(message, position)` for any failure in parse/resolve/generate.
-    fn process_positioned_tokens_from_assembly(&mut self, ptokens: Vec<StarPositionedToken>) ->Result<(StarSymbolTable, usize), (String, StarPosition)> {
+    fn process_positioned_tokens_from_assembly(&mut self, ptokens: Vec<StarPositionedToken>) -> Result<(StarDataMemoryBytes, StarInstructionMemoryBytes, StarPositionMemoryBytes, StarCustomMemoriesHashMap, StarCustomMemoryPositionsHashMap, StarSymbolTable), (String, StarPosition)> {
         match self.parse(&ptokens) {
             Ok(mut ast) => {
+                println!("{:#?}", ast);
                 match self.resolve(&mut ast) {
                     Ok(symbol_table) => {
-                        match self.generate(&ast) {
-                            Ok(data_section_size) => {
-                                return Ok((symbol_table, data_section_size));
-                            }
+                        match generate_bytes_from_ast(&ast) {
+                            Ok((dm, im, pm, cm, cpm)) => Ok((dm, im, pm, cm, cpm, symbol_table)),
                             Err((e_string, e_position)) => return Err((e_string, e_position)),
                         }
                     }
@@ -148,14 +117,7 @@ impl Star {
     ///
     /// The file is canonicalized, read as text, normalized for line endings,
     /// and then passed to `load_from_binary`.
-    ///
-    /// # Returns
-    /// On success, returns the number of bytes loaded into the data section.
-    ///
-    /// # Errors
-    /// Returns an error message and optional position (usually `None` for I/O and
-    /// path errors).
-    pub fn load_from_binary_file(&mut self, file_path: &str) -> Result<usize, (String, Option<StarPosition>)> {
+    pub fn load_memory_from_binary_file(&mut self, file_path: &String) -> Result<usize, (String, Option<StarPosition>)> {
         self.reset();
 
         let file_path_string = file_path.to_string();
@@ -178,24 +140,11 @@ impl Star {
             }
         };
 
-        return self.load_from_binary(&file_content);
+        return self.load_memory_from_binary(&file_content);
     }
 
     /// Loads a program from a textual "binary assembly" representation.
-    ///
-    /// The input is expected to contain the sections `.instr` and `.data`, where each
-    /// token is an 8-bit binary string (e.g. `01010101`). Instructions are appended
-    /// to `instruction_memory` and `.data` bytes are collected and then copied into
-    /// `data_memory` starting at address 0.
-    ///
-    /// # Returns
-    /// On success, returns the number of bytes loaded into the data section.
-    ///
-    /// # Errors
-    /// - Returns `(message, Some(position))` for malformed instruction/data tokens
-    ///   or unknown sections.
-    /// - Returns `(message, None)` if data exceeds available memory bounds.
-    pub fn load_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<StarPosition>)> {
+    pub fn load_memory_from_binary(&mut self, source: &String) -> Result<usize, (String, Option<StarPosition>)> {
         self.reset();
 
         let id_option: Option<usize> = None;
@@ -243,7 +192,7 @@ impl Star {
 
                                 match u8_from_string(aux) {
                                     Ok(v) => {
-                                        self.instruction_memory.push(v);
+                                        self.memories.instruction_memory.push(v);
                                     }
                                     Err(_) => {
                                         return Err((
@@ -257,8 +206,8 @@ impl Star {
                                     }
                                 }
 
-                                if self.instruction_memory.len() % 2 == 0 {
-                                    self.position_memory.push(StarPosition::new(
+                                if self.memories.instruction_memory.len() % 2 == 0 {
+                                    self.memories.position_memory.push(StarPosition::new(
                                         id_option,
                                         tkn_line,
                                         if line_has_identation {
@@ -333,10 +282,10 @@ impl Star {
                         }
                     };
 
-                    self.instruction_memory.push(v);
+                    self.memories.instruction_memory.push(v);
 
-                    if self.instruction_memory.len() % 2 == 0 {
-                        self.position_memory.push(StarPosition::new(
+                    if self.memories.instruction_memory.len() % 2 == 0 {
+                        self.memories.position_memory.push(StarPosition::new(
                             id_option,
                             tkn_line,
                             if line_has_identation {
@@ -375,7 +324,7 @@ impl Star {
         }
 
         for (i, b) in data_memory_vector.iter().enumerate() {
-            match self.data_memory.get_mut(i) {
+            match self.memories.data_memory.get_mut(i) {
                 Some(memory_byte) => *memory_byte = *b,
                 None => return Err(("Data memory out of bounds".to_string(), None)),
             }
@@ -390,15 +339,7 @@ impl Star {
     /// The output format begins with `.instr` followed by 8-bit binary strings for
     /// each instruction byte, then `.data` followed by `data_section_size` bytes from
     /// data memory.
-    ///
-    /// # Parameters
-    /// - `file_path`: Destination path to create/overwrite.
-    /// - `data_section_size`: How many bytes from data memory to serialize.
-    ///
-    /// # Errors
-    /// Returns a string error if the file cannot be created/written or if the
-    /// requested data slice exceeds memory bounds.
-    pub fn save_loaded_binary(&self, file_path: &str, data_section_size: usize) -> Result<(), String> {
+    pub fn save_loaded_binary(&self, file_path: &String, custom_sections: HashMap<String, Vec<u8>>, data_section_size: usize) -> Result<(), String> {
         let mut file = match File::create(file_path.to_string()) {
             Ok(f) => f,
             Err(_) => return Err("Failed to create binary file".to_string()),
@@ -408,7 +349,7 @@ impl Star {
             return Err("Failed to write on binary file".to_string());
         }
 
-        for (index, instr) in self.instruction_memory.iter().enumerate() {
+        for (index, instr) in self.memories.instruction_memory.iter().enumerate() {
             let mut output = format!("{:08b} ", instr);
             if index % 2 == 0 {
                 output = format!("\n{}", output);
@@ -424,7 +365,7 @@ impl Star {
         }
 
         for byte_index in 0..data_section_size {
-            let byte = match self.data_memory.get(byte_index) {
+            let byte = match self.memories.data_memory.get(byte_index) {
                 Some(b) => *b,
                 None => return Err("Data memory out of bounds".to_string()),
             };
@@ -439,17 +380,11 @@ impl Star {
     }
     
     /// Looks up a file id in `file_table` by its full path.
-    ///
-    /// # Returns
-    /// `Some(id)` if the path exists in the table, otherwise `None`.
     pub fn get_file_id_by_path(&self, file_path: &String) -> Option<usize> {
         self.file_table.iter().find_map(|(id, path)| if path == file_path { Some(*id) } else { None })
     }
 
     /// Returns the stored file name/path for a given file id.
-    ///
-    /// # Returns
-    /// The associated string if found, otherwise `"Unknown file"`.
     pub fn get_file_name(&self, file_id: usize) -> String {
         match self.file_table.get(&file_id) {
             Some(name) => name.clone(),
@@ -465,25 +400,30 @@ impl Star {
     }
 
     /// Detaches and returns the currently attached interface, leaving `None` in its place.
-    ///
-    /// # Returns
-    /// The interface if one was attached, otherwise `None`.
     pub fn take_interface(&mut self) -> Option<Box<dyn StarInterface>> {
         self.interface.take()
     }
 
     /// Takes a mutable reference to the currently attached interface and removes it
     /// from the internal `Option` by calling `take()` on the mutable reference.
-    ///
-    /// # Returns
-    /// A mutable reference to the boxed interface if present, otherwise `None`.
-    ///
-    /// # Notes
-    /// This pattern is unusual because it removes the interface from `self` while
-    /// returning a mutable reference derived from `as_mut()`. Use with care to avoid
-    /// surprising ownership/lifetime expectations.
     pub fn take_interface_mut(&mut self) -> Option<&mut Box<dyn StarInterface>> {
         self.interface.as_mut().take()
+    }
+
+    fn load_data_instructions_and_position_memory(&mut self, data_memory: &Vec<u8>, instruction_memory: &Vec<u8>, position_memory: &Vec<StarPosition>) -> Result<(), String> {
+        for (i, d) in data_memory.iter().enumerate() {
+            match self.memories.data_memory.get_mut(i) {
+                Some(byte) => {
+                    *byte = d.clone();
+                }
+                None => return Err( "Data memory overflow".to_string() ),
+            }
+        }
+
+        self.memories.instruction_memory = instruction_memory.clone();
+        self.memories.position_memory = position_memory.clone();
+
+        Ok(())
     }
 
     /// Executes the currently loaded program until the program counter reaches the end
@@ -492,16 +432,8 @@ impl Star {
     /// The VM fetches 16-bit instructions, tracks their source positions, performs
     /// a fast-path for NOPs, decodes instruction formats, and executes arithmetic,
     /// logic, branching, memory access, jumping, and `Mcall` (system call) behavior.
-    ///
-    /// # Returns
-    /// `Ok(())` when execution completes normally.
-    ///
-    /// # Errors
-    /// Returns `(message, position)` for runtime errors such as program counter overflow,
-    /// invalid instruction encodings, or memory access failures. The position is taken
-    /// from `position_memory` when available.
     pub fn execute(&mut self) -> Result<(), (String, Option<StarPosition>)> {
-        let instruction_memory_len = match u16::try_from(self.instruction_memory.len()) {
+        let instruction_memory_len = match u16::try_from(self.memories.instruction_memory.len()) {
             Ok(len) => len,
             Err(_) => {
                 return Err(("StarInstruction memory length exceeds maximum size of 16 bits".to_string(), None))
@@ -510,7 +442,7 @@ impl Star {
 
         'execution_loop: while self.registers.program_counter < instruction_memory_len {
             
-            match self.instruction_memory.get_full_instruction_by_program_counter(self.registers.program_counter) {
+            match self.memories.instruction_memory.get_full_instruction_by_program_counter(self.registers.program_counter) {
                 Some((ir, ip)) => {
                     self.registers.instruction_register = ir;
                     self.registers.instruction_pointer = ip;
@@ -518,7 +450,7 @@ impl Star {
                 None => break 'execution_loop,
             }
             
-            let instruction_position_option = self
+            let instruction_position_option = self.memories
                 .position_memory.get_by_program_counter(self.registers.program_counter)
                 .cloned();
             // ==== PERFORMANCE DETECTOR ====
@@ -760,7 +692,7 @@ impl Star {
                             let reg2_v = self.registers.get_general_register_value(reg2);
 
                             let (low, high) = unsafe { transmute::<u16, (u8, u8)>(reg1_v) };
-                            match self.data_memory.load(reg2_v) {
+                            match self.memories.data_memory.load(reg2_v) {
                                 Ok(value) => {
                                     let v = match instruction {
                                         StarInstruction::Lab => unsafe {
@@ -793,7 +725,7 @@ impl Star {
                                 _ => unreachable!(),
                             };
 
-                            match self.data_memory.store(reg2_v, value) {
+                            match self.memories.data_memory.store(reg2_v, value) {
                                 Ok(_) => {}
                                 Err(e) => return  Err((
                                     e,
@@ -867,5 +799,16 @@ impl Star {
         }
         io::stdout().flush().unwrap();
         return Ok(());
+    }
+
+    pub fn get_error_message_from_message_and_optional_position(&self, message: String, position_option: Option<StarPosition>) -> String {
+        match position_option {
+            Some(pos) => format!("{} - [{}]", message, pos.get_position_path(self)),
+            None => format!("{}", message),
+        }
+    }
+
+    pub fn get_error_message_from_message_and_position(&self, message: String, position: StarPosition) -> String {
+        format!("{} - [{}]", message, position.get_position_path(self))
     }
 }

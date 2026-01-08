@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StarPseudoInstruction {
     // ==== Memory Pseudo Instructions ====
     Nope, // --> add $zero, $zero, $zero

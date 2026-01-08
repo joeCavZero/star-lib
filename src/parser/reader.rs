@@ -1,4 +1,4 @@
-use crate::parseable::StarSequence;
+use crate::parser::StarSequence;
 use crate::core::*;
 
 pub fn read_r_r_sequence(ptokens: &Vec<StarPositionedToken>, start_index: usize, base_position: StarPosition) -> Result<StarSequence, (String, StarPosition)> {

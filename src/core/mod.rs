@@ -15,6 +15,8 @@ pub mod position_memory;
 pub mod instruction_memory;
 pub mod data_memory;
 pub mod file_table;
+pub mod section;
+pub mod memories;
 
 pub use core::*;
 pub use registers::*;
@@ -33,3 +35,5 @@ pub use position_memory::*;
 pub use instruction_memory::*;
 pub use data_memory::*;
 pub use file_table::*;
+pub use section::*;
+pub use memories::*;

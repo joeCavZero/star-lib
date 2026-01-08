@@ -109,19 +109,19 @@ impl StarMcallContext for Star {
     }
 
     fn get_data_memory(&self) -> &StarDataMemory {
-        &self.data_memory
+        &self.memories.data_memory
     }
 
     fn get_data_memory_mut(&mut self) -> &mut StarDataMemory {
-        &mut self.data_memory
+        &mut self.memories.data_memory
     }
 
     fn get_instruction_memory(&self) -> &StarInstructionMemory {
-        &self.instruction_memory
+        &self.memories.instruction_memory
     }
 
     fn get_position_memory(&self) -> &StarPositionMemory {
-        &self.position_memory
+        &self.memories.position_memory
     }
 
     fn get_file_table(&self) -> &StarFileTable {

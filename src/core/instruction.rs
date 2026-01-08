@@ -1,6 +1,6 @@
 use crate::core::StarFormat;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StarInstruction {
     // ==== OOOO_XXXX_YYYY_ZZZZ ====
 

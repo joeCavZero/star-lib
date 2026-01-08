@@ -1,10 +1,9 @@
 pub mod core;
 pub mod utils;
-pub mod scannable;
-pub mod parseable;
-pub mod resolveable;
-pub mod symbolable;
-pub mod generateable;
+pub mod scanner;
+pub mod parser;
+pub mod resolver;
+pub mod generation;
 pub mod math;
 
 pub mod prelude;

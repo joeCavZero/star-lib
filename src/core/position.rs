@@ -6,7 +6,7 @@ use crate::core::Star;
 /// A `StarPosition` optionally tracks the originating file, line number,
 /// and column number, enabling precise diagnostics and error reporting across
 /// multi-file assembly inputs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StarPosition {
     /// Optional file identifier, referring to an entry in the VM file table.
     pub file: Option<usize>,

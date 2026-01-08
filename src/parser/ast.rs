@@ -2,21 +2,71 @@ use std::collections::HashMap;
 
 use crate::core::*;
 use crate::math::*;
-use crate::parseable::*;
-use crate::resolveable::*;
+use crate::parser::sequence::*;
+use crate::resolver::*;
 
-pub trait StarSymbolable {
-    fn get_symbol_table(&self, ast: &mut Ast) -> Result<StarSymbolTable, (String, StarPosition)>;
+pub type StarDataSection = Vec<StarDataCamp>;
+
+pub type StarInstrSection = Vec<StarInstrCamp>;
+
+#[derive(Debug, Clone)]
+pub enum StarCustomSection {
+    Data(StarDataSection),
+    Instr(StarInstrSection),
 }
 
-impl StarSymbolable for Star {
-    fn get_symbol_table(&self, ast: &mut Ast) -> Result<StarSymbolTable, (String, StarPosition)> {
+pub type StarCustomSections = HashMap<StarCustomSectionDefinition, StarCustomSection>;
+
+
+#[derive(Debug, Clone)]
+pub struct StarInstrCamp {
+    pub label_declarations: Vec<StarPositionedToken>,
+    pub instruction: StarPositionedToken,
+    pub sequence: StarSequence,
+}
+
+#[derive(Debug, Clone)]
+pub struct StarDataCamp {
+    pub label_declarations: Vec<StarPositionedToken>,
+    pub directive: StarPositionedToken,
+    pub arg: StarDataCampArg,
+}
+
+#[derive(Debug, Clone)]
+pub enum StarDataCampArg {
+    Empty,
+    Unique(StarPositionedToken),
+    Multiple(Vec<StarPositionedToken>),
+}
+
+
+
+
+
+
+#[derive(Debug, Clone)]
+pub struct StarAst {
+    pub data_section: StarDataSection,
+    pub instr_section: StarInstrSection,
+    pub custom_sections: StarCustomSections
+}
+
+impl StarAst {
+    pub fn new() -> Self {
+        Self  {
+            data_section: Vec::new(),
+            instr_section: Vec::new(),
+            custom_sections: HashMap::new(),
+        }
+    }
+
+    pub fn get_symbol_table(&mut self) -> Result<StarSymbolTable, (String, StarPosition)> {
         let mut symbol_table: StarSymbolTable = HashMap::new();
 
         // >>>> DATA MEMORY <<<<
         let mut data_memory_counter: usize = 0;
 
-        for data_camp in ast.data_field.iter() {
+        for data_camp in self.data_section.iter() {
             // ==== Process of collecting labels ====
             for label_ptk in data_camp.label_declarations.iter() {
                 match label_ptk.token {
@@ -51,11 +101,11 @@ impl StarSymbolable for Star {
             match data_camp.directive.token {
                 // ==== BYTE DIRECTIVE ====
                 StarToken::StarDirective(StarDirective::Byte) => {
-                    if let DataCampArg::Multiple(ref ptk_args) = data_camp.arg {
+                    if let StarDataCampArg::Multiple(ref ptk_args) = data_camp.arg {
                         for ptk_arg in ptk_args.iter() {
                             match data_memory_counter.checked_add(1) {
                                 Some(new_value) => {
-                                    if new_value > DATA_MEMORY_SIZE {
+                                    if new_value > STAR_MEMORY_64KB {
                                         return Err((
                                             "Data memory overflow".to_string(),
                                             ptk_arg.position,
@@ -79,11 +129,11 @@ impl StarSymbolable for Star {
 
                 // ==== WORD DIRECTIVE ====
                 StarToken::StarDirective(StarDirective::Word) => {
-                    if let DataCampArg::Multiple(ref ptk_args) = data_camp.arg {
+                    if let StarDataCampArg::Multiple(ref ptk_args) = data_camp.arg {
                         for ptk_arg in ptk_args.iter() {
                             match data_memory_counter.checked_add(2) {
                                 Some(new_value) => {
-                                    if new_value > DATA_MEMORY_SIZE {
+                                    if new_value > STAR_MEMORY_64KB {
                                         return Err((
                                             "Data memory overflow".to_string(),
                                             ptk_arg.position,
@@ -107,7 +157,7 @@ impl StarSymbolable for Star {
 
                 // ==== SPACE DIRECTIVE ====
                 StarToken::StarDirective(StarDirective::Space) => {
-                    if let DataCampArg::Unique(ref ptk_arg) = data_camp.arg {
+                    if let StarDataCampArg::Unique(ref ptk_arg) = data_camp.arg {
                         match ptk_arg.token {
                             StarToken::NumberLiteral(ref num_string) => {
                                 let num = match u16_from_string(num_string.clone()) {
@@ -119,7 +169,7 @@ impl StarSymbolable for Star {
 
                                 match data_memory_counter.checked_add(num as usize) {
                                     Some(ndmv) => {
-                                        if ndmv > DATA_MEMORY_SIZE {
+                                        if ndmv > STAR_MEMORY_64KB {
                                             return Err((
                                                 "Data memory overflow".to_string(),
                                                 ptk_arg.position,
@@ -146,7 +196,7 @@ impl StarSymbolable for Star {
                 // ==== STRING AND STRINGZ DIRECTIVES ====
                 StarToken::StarDirective(StarDirective::String)
                 | StarToken::StarDirective(StarDirective::Stringz) => {
-                    if let DataCampArg::Unique(ref ptk_arg) = data_camp.arg {
+                    if let StarDataCampArg::Unique(ref ptk_arg) = data_camp.arg {
                         match ptk_arg.token {
                             StarToken::StringLiteral(ref string_literal) => {
                                 let mut string_len = string_literal.len();
@@ -167,7 +217,7 @@ impl StarSymbolable for Star {
 
                                 match data_memory_counter.checked_add(len_u16 as usize) {
                                     Some(new_value) => {
-                                        if new_value > DATA_MEMORY_SIZE {
+                                        if new_value > STAR_MEMORY_64KB {
                                             return Err((
                                                 "Data memory overflow".to_string(),
                                                 ptk_arg.position,
@@ -192,7 +242,7 @@ impl StarSymbolable for Star {
                 }
 
                 StarToken::StarDirective(StarDirective::Checkpoint) => {
-                    if let DataCampArg::Empty = data_camp.arg {
+                    if let StarDataCampArg::Empty = data_camp.arg {
                         // Nothing to do here
                     } else {
                         unreachable!();
@@ -204,7 +254,7 @@ impl StarSymbolable for Star {
         }
 
         // >>>> INSTRUCTION MEMORY <<<<
-        for (instruction_index, instruction) in ast.instr_field.iter().enumerate() {
+        for (instruction_index, instruction) in self.instr_section.iter().enumerate() {
             for label_ptk in instruction.label_declarations.iter() {
                 match label_ptk.token {
                     StarToken::LabelDeclaration(ref label_name) => {

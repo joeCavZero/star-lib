@@ -1,4 +1,4 @@
-pub const DATA_MEMORY_SIZE: usize = 65536;
+pub const STAR_MEMORY_64KB: usize = 65536;
 
 /// Represents the data memory (RAM) of the `Star` virtual machine.
 ///
@@ -14,7 +14,7 @@ pub const DATA_MEMORY_SIZE: usize = 65536;
 /// Data memory is accessed during execution by load/store instructions and may
 /// also be inspected or modified by system-call interfaces through controlled
 /// accessors.
-pub type StarDataMemory = [u8; DATA_MEMORY_SIZE];
+pub type StarDataMemory = [u8; STAR_MEMORY_64KB];
 
 /// Defines the interface for readable and writable data memory in the `Star`
 /// virtual machine.

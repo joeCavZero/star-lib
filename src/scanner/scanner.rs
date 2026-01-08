@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::core::*;
 use crate::utils::*;
-use crate::scannable::positioned_tokens_vectorable::*;
+use crate::scanner::positioned_tokens_vectorable::*;
 
 type StarMacroTable = HashMap<String, (Vec<StarPositionedToken>, Vec<StarPositionedToken>)>;
 

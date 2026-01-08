@@ -1,7 +1,7 @@
-pub mod generateable;
+pub mod generation;
 pub mod folder;
 pub mod defolder;
 
-pub use generateable::*;
+pub use generation::*;
 pub use folder::*;
 pub use defolder::*;

@@ -1,7 +1,7 @@
 use crate::utils::*;
 use crate::core::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StarToken {
     StarProcessor(StarProcessor),
     StarGeneralRegister(StarGeneralRegister),
@@ -154,7 +154,7 @@ impl StarToken {
                     ".string" => Ok(StarToken::StarDirective(StarDirective::String)),
                     ".stringz" => Ok(StarToken::StarDirective(StarDirective::Stringz)),
                     ".checkpoint" => Ok(StarToken::StarDirective(StarDirective::Checkpoint)),
-                    _ => Err("Invalid directive".to_string()),
+                    _ => Ok(StarToken::StarDirective(StarDirective::Custom(tkn_string))),
                 }
             }
 

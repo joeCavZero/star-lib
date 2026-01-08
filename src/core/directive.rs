@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StarDirective {
     Data,
     Instr,
@@ -8,4 +8,5 @@ pub enum StarDirective {
     String,
     Stringz,
     Checkpoint,
+    Custom(String),
 }

@@ -1,4 +1,4 @@
-use crate::core::DATA_MEMORY_SIZE;
+use crate::core::STAR_MEMORY_64KB;
 use crate::core::StarGeneralRegister;
 
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ impl StarRegisters {
             low: rand::random::<u16>(),
             high: rand::random::<u16>(),
             return_address: rand::random::<u16>(),
-            stack_pointer: (DATA_MEMORY_SIZE - 1) as u16,
+            stack_pointer: (STAR_MEMORY_64KB - 1) as u16,
             program_counter: 0,
             instruction_pointer: rand::random::<u32>(),
             instruction_register: rand::random::<u16>(),

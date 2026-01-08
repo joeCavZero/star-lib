@@ -1,22 +1,24 @@
+
 use crate::core::*;
 use super::ast::*;
 use super::reader::*;
 use super::sequence::*;
 
 pub trait StarParseable {
-    fn parse(&self, ptokens: &Vec<StarPositionedToken>) -> Result<Ast, (String, StarPosition)>;
+    fn parse(&self, ptokens: &Vec<StarPositionedToken>) -> Result<StarAst, (String, StarPosition)>;
     fn read_comma_separated_numbers(&self, ptokens: &Vec<StarPositionedToken>, start_index: usize) -> Vec<StarPositionedToken>;
 }
 
 impl StarParseable for Star {
-    fn parse(&self, ptokens: &Vec<StarPositionedToken>) -> Result<Ast, (String, StarPosition)> {
-        let mut ast = Ast {
-            data_field: Vec::new(),
-            instr_field: Vec::new(),
-        };
+    fn parse(&self, ptokens: &Vec<StarPositionedToken>) -> Result<StarAst, (String, StarPosition)> {
+        let mut ast = StarAst::new();
 
-        let mut field: StarDirective = StarDirective::Instr;
+        let mut section_directive: StarDirective = StarDirective::Instr;
+        let mut section_type = StarSectionParsingType::Instr;
+        let mut section_name: String = String::new();
+
         let mut label_declaration_accumulator: Vec<StarPositionedToken> = Vec::new();
+        
 
         let mut ptk_counter = 0;
         while ptk_counter < ptokens.len() {
@@ -25,24 +27,81 @@ impl StarParseable for Star {
                 None => unreachable!(),
             };
 
-            match ptk.token {
-                // ==== Detect the current field ====
-                StarToken::StarDirective(StarDirective::Data) => {
-                    field = StarDirective::Data;
+            match ptk.token.clone() {
+                // ==== Detect the current section ====
+                StarToken::StarDirective( StarDirective::Data ) => {
+                    section_directive = StarDirective::Data;
+                    section_type = StarSectionParsingType::Data;
+                    section_name = ".data".to_string();
+
                     ptk_counter += 1;
                     continue;
                 }
-                StarToken::StarDirective(StarDirective::Instr) => {
-                    field = StarDirective::Instr;
+                StarToken::StarDirective( StarDirective::Instr ) => {
+                    section_directive = StarDirective::Instr;
+
+                    section_type = StarSectionParsingType::Instr;
+                    section_name = ".instr".to_string();
+
+                    ptk_counter += 1;
+                    continue;
+                }
+                StarToken::StarDirective(StarDirective::Custom(custom_section_string)) => {
+                    section_directive = StarDirective::Custom(custom_section_string.clone());
+
+                    let custom_section_definition_option = self.custom_memories_definitions.iter().find(|&csd| csd.name == custom_section_string);
+                    
+                    (section_type, section_name) = match custom_section_definition_option {
+                        Some(csd) => (csd.section_type.clone(), csd.name.clone()),
+                        None => return Err((
+                            format!("Directive not defined: {}", custom_section_string),
+                            ptk.position.clone(),
+                        )),
+                    };
+
                     ptk_counter += 1;
                     continue;
                 }
 
-                // ==== Case not is a Data or Instr StarDirective ====
+                // ==== Caso não for Star Section ====
                 _ => {
-                    match field {
-                        // ==== Data Field ====
-                        StarDirective::Data => {
+                    match section_type {
+                        // ==== Data Analysis ====
+                        StarSectionParsingType::Data  => {
+                            let data_section: &mut StarDataSection = match section_directive {
+                                StarDirective::Data => &mut ast.data_section,
+
+                                StarDirective::Custom(ref custom_directive_string) => {
+                                    ast.custom_sections
+                                        .iter_mut()
+                                        .find_map(|(csd, cs)| {
+                                            if csd.name == section_name && csd.section_type == section_type {
+                                                match cs {
+                                                    StarCustomSection::Data(custom_data_section) => Some(custom_data_section),
+                                                    _ => None,
+                                                }
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .ok_or_else(|| {
+                                            (
+                                                format!("Invalid custom section definition: {}", custom_directive_string),
+                                                ptk.position.clone(),
+                                            )
+                                        })?
+                                }
+
+                                StarDirective::Instr => {
+                                    return Err((
+                                        format!("Invalid section type for instruction section: {}", section_name),
+                                        ptk.position.clone(),
+                                    ));
+                                }
+
+                                _ => {unreachable!()}
+                            };
+
                             match ptk.token {
                                 StarToken::LabelDeclaration(_) => {
                                     label_declaration_accumulator.push(ptk.clone());
@@ -63,11 +122,11 @@ impl StarParseable for Star {
                                         ));
                                     }
 
-                                    ast.data_field.push(
-                                        DataCamp {
+                                    data_section.push(
+                                        StarDataCamp {
                                             label_declarations: label_declaration_accumulator.clone(),
                                             directive: ptk.clone(),
-                                            arg: DataCampArg::Multiple(data.clone()),
+                                            arg: StarDataCampArg::Multiple(data.clone()),
                                         }
                                     );
 
@@ -80,11 +139,11 @@ impl StarParseable for Star {
                                     match ptokens.get(ptk_counter + 1) {
                                         Some(next_ptk) => {
                                             if let StarToken::NumberLiteral(_) = next_ptk.token {
-                                                ast.data_field.push(
-                                                    DataCamp {
+                                                data_section.push(
+                                                    StarDataCamp {
                                                         label_declarations: label_declaration_accumulator.clone(),
                                                         directive: ptk.clone(),
-                                                        arg: DataCampArg::Unique(next_ptk.clone()),
+                                                        arg: StarDataCampArg::Unique(next_ptk.clone()),
                                                     }
                                                 );
                                                 ptk_counter += 2;
@@ -111,11 +170,11 @@ impl StarParseable for Star {
                                     match ptokens.get(ptk_counter + 1) {
                                         Some(next_ptk) => {
                                             if let StarToken::StringLiteral(_) = next_ptk.token {
-                                                ast.data_field.push(
-                                                    DataCamp {
+                                                data_section.push(
+                                                    StarDataCamp {
                                                         label_declarations: label_declaration_accumulator.clone(),
                                                         directive: ptk.clone(),
-                                                        arg: DataCampArg::Unique(next_ptk.clone()),
+                                                        arg: StarDataCampArg::Unique(next_ptk.clone()),
                                                     }
                                                 );
                                                 ptk_counter += 2;
@@ -138,11 +197,11 @@ impl StarParseable for Star {
                                 }
 
                                 StarToken::StarDirective(StarDirective::Checkpoint) => {
-                                    ast.data_field.push(
-                                        DataCamp {
+                                    data_section.push(
+                                        StarDataCamp {
                                             label_declarations: label_declaration_accumulator.clone(),
                                             directive: ptk.clone(),
-                                            arg: DataCampArg::Empty,
+                                            arg: StarDataCampArg::Empty,
                                         }
                                     );
                                     ptk_counter += 1;
@@ -152,15 +211,49 @@ impl StarParseable for Star {
 
                                 _ => {
                                     return Err((
-                                        "Invalid expression in data field".to_string(),
+                                        "Invalid expression in data section".to_string(),
                                         ptk.position.clone(),
                                     ));
                                 }
                             }
                         }
 
-                        // ==== StarInstruction Field ====
-                        StarDirective::Instr => {
+                        // ==== Instruction Analysis ====
+                        StarSectionParsingType::Instr => {
+                            let instr_section: &mut StarInstrSection = match section_directive {
+                                StarDirective::Instr => &mut ast.instr_section,
+
+                                StarDirective::Custom(ref custom_directive_string) => {
+                                    ast.custom_sections
+                                        .iter_mut()
+                                        .find_map(|(csd, cs)| {
+                                            if csd.name == section_name && csd.section_type == section_type {
+                                                match cs {
+                                                    StarCustomSection::Instr(custom_instr_section) => Some(custom_instr_section),
+                                                    _ => None,
+                                                }
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .ok_or_else(|| {
+                                            (
+                                                format!("Invalid custom section definition: {}", custom_directive_string),
+                                                ptk.position.clone(),
+                                            )
+                                        })?
+                                }
+
+                                StarDirective::Data => {
+                                    return Err((
+                                        format!("Invalid section type for data section: {}", section_name),
+                                        ptk.position.clone(),
+                                    ));
+                                }
+
+                                _ => {unreachable!();}
+                            };
+
                             match ptk.token.clone() {
                                 // ==== Label Declaration ====
                                 StarToken::LabelDeclaration(_) => {
@@ -173,8 +266,8 @@ impl StarParseable for Star {
                                     match instr {
                                         // ==== READ NONE ====
                                         StarInstruction::Mcall => {
-                                            ast.instr_field.push(
-                                                InstrCamp {
+                                            instr_section.push(
+                                                StarInstrCamp {
                                                     label_declarations: label_declaration_accumulator.clone(),
                                                     instruction: ptk.clone(),
                                                     sequence: StarSequence::Zero,
@@ -189,8 +282,8 @@ impl StarParseable for Star {
                                         StarInstruction::J => {
                                             match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -219,8 +312,8 @@ impl StarParseable for Star {
                                         | StarInstruction::Not => {
                                             match read_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -241,8 +334,8 @@ impl StarParseable for Star {
                                         | StarInstruction::Lli => {
                                             match read_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -274,8 +367,8 @@ impl StarParseable for Star {
                                         | StarInstruction::Bltur => {
                                             match read_r_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(three_seq) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence: three_seq,
@@ -297,8 +390,8 @@ impl StarParseable for Star {
                                     match pseudo_instr {
                                         StarPseudoInstruction::Nope
                                         | StarPseudoInstruction::Ret => {
-                                            ast.instr_field.push(
-                                                InstrCamp {
+                                            instr_section.push(
+                                                StarInstrCamp {
                                                     label_declarations: label_declaration_accumulator.clone(),
                                                     instruction: ptk.clone(),
                                                     sequence: StarSequence::Zero,
@@ -314,8 +407,8 @@ impl StarParseable for Star {
                                         | StarPseudoInstruction::Jr => {
                                             match read_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -335,8 +428,8 @@ impl StarParseable for Star {
                                         StarPseudoInstruction::Ja => {
                                             match read_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -357,8 +450,8 @@ impl StarParseable for Star {
                                         | StarPseudoInstruction::Swap => {
                                             match read_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -377,8 +470,8 @@ impl StarParseable for Star {
                                         StarPseudoInstruction::Li => {
                                             match read_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -398,8 +491,8 @@ impl StarParseable for Star {
                                         StarPseudoInstruction::La => {
                                             match read_r_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -421,8 +514,8 @@ impl StarParseable for Star {
                                         | StarPseudoInstruction::Mod => {
                                             match read_r_r_r_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(three_seq) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence: three_seq,
@@ -451,8 +544,8 @@ impl StarParseable for Star {
                                         | StarPseudoInstruction::Modi => {
                                             match read_r_r_n_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -475,8 +568,8 @@ impl StarParseable for Star {
                                         | StarPseudoInstruction::Sw => {
                                             match read_r_r_br_n_br(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -501,8 +594,8 @@ impl StarParseable for Star {
                                         | StarPseudoInstruction::Bltua => {
                                             match read_r_r_id_sequence(&ptokens, ptk_counter + 1, ptk.position) {
                                                 Ok(sequence) => {
-                                                    ast.instr_field.push(
-                                                        InstrCamp {
+                                                    instr_section.push(
+                                                        StarInstrCamp {
                                                             label_declarations: label_declaration_accumulator.clone(),
                                                             instruction: ptk.clone(),
                                                             sequence,
@@ -522,14 +615,13 @@ impl StarParseable for Star {
 
                                 _ => {
                                     return Err((
-                                        "Invalid expression in instruction field".to_string(),
+                                        "Invalid expression in instruction section".to_string(),
                                         ptk.position.clone(),
                                     ));
                                 }
                             }
                         }
 
-                        _ => unreachable!(),
                     }
                 }
             }
