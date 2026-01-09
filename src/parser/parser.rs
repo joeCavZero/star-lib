@@ -118,7 +118,7 @@ pub fn parse(ptokens: &Vec<StarPositionedToken>, custom_sections: &Vec<StarCusto
                             | StarToken::StarDirective(StarDirective::Word) => {
                                 let data: Vec<StarPositionedToken> =
                                     read_comma_separated_numbers(ptokens, ptk_counter + 1);
-
+                                    
                                 let data_len = data.len();
                                 if data_len == 0 {
                                     return Err((
@@ -676,21 +676,29 @@ fn read_comma_separated_numbers(
     ptokens: &Vec<StarPositionedToken>,
     start_index: usize,
 ) -> Vec<StarPositionedToken> {
-    let mut numbers: Vec<StarPositionedToken> = Vec::new();
-    let mut index: usize = start_index;
+    let mut numbers = Vec::new();
+    let mut index = start_index;
 
-    while index < ptokens.len() {
-        let ptk = match ptokens.get(index) {
-            Some(ptk) => ptk,
-            None => break,
-        };
-        match ptk.token {
-            StarToken::NumberLiteral(_) => {
-                numbers.push(ptk.clone());
-                index += 1;
-            }
-            StarToken::Comma => {
-                index += 1;
+    let Some(ptk) = ptokens.get(index) else {
+        return numbers;
+    };
+
+    match ptk.token {
+        StarToken::NumberLiteral(_) => {
+            numbers.push(ptk.clone());
+            index += 1;
+        }
+        _ => return numbers,
+    }
+
+    while index + 1 < ptokens.len() {
+        let comma = &ptokens[index];
+        let next = &ptokens[index + 1];
+
+        match (&comma.token, &next.token) {
+            (StarToken::Comma, StarToken::NumberLiteral(_)) => {
+                numbers.push(next.clone());
+                index += 2;
             }
             _ => break,
         }
@@ -698,3 +706,4 @@ fn read_comma_separated_numbers(
 
     numbers
 }
+
