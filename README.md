@@ -43,12 +43,6 @@ fn main() {
 ```
 ---
 
-## Introduction
-
-To get started with the **Star Virtual Machine** you can read the the [introduction](/docs/introduction.md).
-
----
-
 ## Introduction to Star Interfacing
 
 To get started with the **Star** interfacing system you can read the following documentation:
