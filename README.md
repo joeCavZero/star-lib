@@ -4,7 +4,7 @@
 
 <h1 align="center">STAR VIRTUAL MACHINE LIB</h1>
 
-A extensible 16-bit virtual machine and assembly programming language library designed for educational purposes.
+An extensible 16-bit virtual machine and assembly programming language library designed for educational purposes.
 
 ---
 
